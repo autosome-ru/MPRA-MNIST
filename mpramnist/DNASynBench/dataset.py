@@ -39,6 +39,7 @@ class SimpleMotifDataset(MpraDataset):
         self.prefix = self.FLAG + "_"
         self.ds = {"targets": [], "seq": []}
         self.name_for_split_info = self.prefix
+        self.n_classes = 2
         
     def generate(self,
         motif: str,
@@ -256,6 +257,7 @@ class AlienDataset(MpraDataset):
         self.prefix = self.FLAG + "_"
         self.ds = {"targets": [], "seq": []}
         self.name_for_split_info = self.prefix
+        self.n_classes = 2
         
     def generate(self,
         motif: str,
@@ -354,6 +356,7 @@ class CombinationDataset(MpraDataset):
         self.prefix = self.FLAG + "_"
         self.ds = {"targets": [], "seq": []}
         self.name_for_split_info = self.prefix
+        self.n_classes = 2
         
     def generate(self,
         motif: str,
@@ -452,6 +455,7 @@ class DistanceDataset(MpraDataset):
         self.prefix = self.FLAG + "_"
         self.ds = {"targets": [], "seq": []}
         self.name_for_split_info = self.prefix
+        self.n_classes = 2
         
     def generate(self,
         motif: str,
