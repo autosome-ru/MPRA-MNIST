@@ -358,6 +358,12 @@ class AgarwalMultiDataset(AgarwalSingleDataset):
             Cell type(s) for filtering the data. Can be:
             - str: Single cell type ('HepG2', 'K562', or 'WTC11')
             - List[str]: Multiple cell types
+        use_specificity_score: bool, bool=True
+            Whether to employ the specificity scores provided by the AgarwalMulti study.
+            The authors defined specificity as the deviation of each element's activity 
+            from its mean across all cell types, highlighting cell‑type‑specific signals.
+            Setting this parameter to False instead returns the raw activity values, 
+            computed as the log2‑ratio of RNA reads to DNA reads for each element.
         genomic_regions : Optional[Union[str, List[Dict]]], optional
             Genomic regions to include or exclude. Can be:
             - str: Path to BED file containing genomic regions (hg38, 0-based)

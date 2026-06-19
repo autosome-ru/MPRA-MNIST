@@ -1,4 +1,4 @@
-# Agarwal dataset
+# Agarwal Single and Multi dataset
 
 ## Main Information
 
@@ -18,14 +18,19 @@ The study tested **over 200,000 sequences** in a single experiment, including:
 *   **Canonical promoters:** Centered on transcription start sites (TSS)
 *   **Shuffled enhancer sequences:** With preserved dinucleotide composition (negative controls)
 *   **Control elements:** With known activity in HepG2, K562, and WTC11 cell lines
-*   **60,000 sequences tested in all three cell lines** (joint library)
+*   **60,000 sequences tested in all three cell lines** (**AgarwalMulti** library)
 
 ### Dataset Composition
 
-The processed dataset comprises:
+The processed **AgarwalSingle** dataset comprises:
 *   **HepG2:** 122,926 sequences
 *   **K562:** 196,664 sequences  
 *   **WTC11:** 46,185 sequences
+
+The **AgarwalMulti** library was constructed by **selecting and re-testing elements from the individual large-scale libraries** in all three cell lines (HepG2, K562, WTC11). This enables direct comparison of the same sequences' activity across different cellular contexts.
+After filtering elements (as described in the original methodology), the final processed dataset contains:
+
+**55,338 sequences** × **3 cell lines** = **166,014 activity measurements**
 
 All sequences are **200 nucleotides long** (excluding constant 15-nt flanks). Data is split into training, validation, and test sets using an 8:1:1 ratio, following the original study.
 
@@ -37,31 +42,21 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/exampl
 
 ### Calculation of Regulatory Activity
 
-The regression task involves predicting scalar values representing the **regulatory activity** (enhancer/promoter strength) for each cell line.
+The regression task involves predicting scalar values representing the **activity score** (enhancer/promoter strength) for each cell line.
 
 **Key steps from the original study:**
 1. **Replicate measurements:** Three independent biological replicates for both DNA and RNA
 2. **Barcode filtering:** Elements measured with <10 independent barcodes were excluded to reduce noise
 3. **Activity calculation:** For each replicate: *log₂(RNA reads / DNA reads)*
-4. **Normalization:** Activity values were normalized to the median within each replicate
-5. **Replicate averaging:** Normalized values were averaged across three replicates
 
-### Final Activity Score
-
-The target variable represents:
-**Mean normalized log₂(RNA/DNA)** across three biological replicates
-
-This provides a robust measure of regulatory element activity that accounts for:
-- Technical variability through barcode counting
-- Biological variability through replicate measurements
-- Normalization for batch effects
+4. **Specificity score for AgarwalMulti:** Measured the deviation of each element from its mean activity across cell types
 
 ### Data Representation
 
+#### AgarwalSingle
 ```
-
 seq_id	    chromosome  start	    end	        strand	    seq	                expression	    averaged_expression	        fold
-seq10002_R	    10	    88965538	88965738	-	        AGCAATCCCTGGGAAAA	-1.306	            -1.306	                10
+---------------------------------------------------------------------------------------------------------
 seq10004_F	    10	    89029900	89030100	+	        TAGCTCAACACAAATCC	 0.43	            -0.017	                10
 seq10004_R	    10	    89029900	89030100	-	        CATTGTTTCCATAGGGA	-0.464	            -0.017	                10
 seq10005_F	    10	    89032143	89032343	+	        GACCCTAAATCAGTATG	-1.231	            -1.6350000000000002	    7
@@ -69,15 +64,38 @@ seq10005_R	    10	    89032143	89032343	-	        AAAGGGACTTTCCGCAT	-2.039	     
 ```
 
 **Column descriptions:**
-*   `expression`: Mean normalized activity across 3 replicates for the individual sequence
-*   `averaged_expression`: Mean of forward and reverse-complement activities for the same genomic region
+*   `expression`: Activity score *log₂(RNA reads / DNA reads)*
+*   `averaged_expression`: Mean of activity scores of forward and reverse-complement sequences
 *   `fold`: Cross-validation fold (1-10)
 
-## Parameters
+#### AgarwalMulti
+
+```
+seq_id	chromosome_hg19	start_hg19	end_hg19	strand_hg19	chromosome	start	end	strand	seq	HepG2_Specificity_Score	K562_Specificity_Score	WTC11_Specificity_Score	fold	HepG2_log2	K562_log2	WTC11_log2
+---------------------------------------------------------------------------------------------------------
+ENSG00000000971	1	196620911.0	196621111.0	+	1	196651781	196651981	+	GATATCACCAGCTGCTGATTTGCACAT...	0.0705767810952613	-0.386981332585921	0.26108557591418	2	-0.5749999999999998	-0.788	-1.024
+ENSG00000001630	7	91763598.0	91763798.0	-	7	92134284	92134484	-	TGGGTTTAGTAGGAGACCTGGGGCAAG...	-0.250686030152044	-0.167357423155188	0.382690550999934	6	-1.234	-1.126	-1.426
+ENSG00000002726	7	150521782.0	150521982.0	+	7	150824694	150824894	+	CAAGGTGGCTGGGGAGAAGGCCGAGGT...	0.547128759230438	-0.49542235153705	-0.103962309065462	10	-0.12	-0.5879999999999999	-0.939
+ENSG00000003056	12	9102102.0	9102302.0	-	12	8949506	8949706	-	GGGGTCTGGTGGGAGGAGCGGTTGCCC...	-0.638726825596637	-0.133358216202116	0.726073181797631	1	0.973	1.295	2.165
+
+```
+
+**Column descriptions:**
+*   `HepG2_Specificity_Score`, `K562_Specificity_Score`, `WTC11_Specificity_Score` : Mean normalized activity across 3 replicates for the individual sequence for current cell type
+*   `HepG2_log2`, `K562_log2`, `WTC11_log2` : Raw activity values
+*   `fold`: Cross-validation fold (1-10)
+
+## AgarwalSingle Parameters
+
+```python
+Cell_Type = "HepG2" # or K562 or WTC11
+
+train_dataset = AgarwalSingleDataset(cell_type=Cell_Type, split="train", transform=train_transform, root="../data/",)
+```
 
 ### **`split : Union[str, List[int], int]`**
 
-Defines which data split to use. Opions:
+Defines which data split to use. Options:
 - String: `'train'`, `'val'`, `'test'` (uses predefined fold sets)
 - List[int]: List of specific fold numbers (`1-10`)
 - int: Single fold number (`1-10`)
@@ -115,6 +133,22 @@ Transformation function applied to each sequence
 
 Transformation function applied to target values
 
+## AgarwalMulti parameters
+
+```python
+Cell_Type = "HepG2" # or K562 or WTC11
+
+train_dataset = AgarwalMultiDataset(cell_type=Cell_Type, split="train", transform=train_transform, root="../data/",)
+```
+
+All the parameters listed below are applicable to **AgarwalMulti** dataset, including:
+
+### **`use_specificity_score: bool = True`**
+For the AgarwalMulti dataset, two representations are available:
+- specificity score (default) – measures each element’s deviation from its 
+    mean activity across cell types (as in the original publication).
+- raw activity – the direct log₂(RNA / DNA) read count ratio.
+Switch to False to use the raw activity instead of the specificity score.
 
 ## Data Handling Considerations
 
@@ -128,131 +162,143 @@ Transformation function applied to target values
 
 5) **Target Selection**: You can use either individual sequence activity measurements (`averaged_target = False`, using the *expression* column) or averaged activities between forward and reverse-complement sequences (`averaged_target = True`, using the *averaged_expression* column).
 
-6) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/AgarwalDataset_example.ipynb) for detailed usage example and training
+6) **Specificity score for AgarwalMulti:** The authors defined specificity as the deviation of each element's activity from its mean across all cell types, highlighting cell‑type‑specific signals. Setting `use_specificity_score` parameter to False instead returns the raw activity values, computed as the log2‑ratio of RNA reads to DNA reads for each element. For all MPRA-MNIST computations we used `use_specificity_score`=True.
+
+7) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/AgarwalDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    import mpramnist
-    from mpramnist.Agarwal.dataset import AgarwalDataset
-    import torch.utils.data as data
-    import mpramnist.transforms as t
+# Single
+from mpramnist.Agarwal2025.dataset import AgarwalSingleDataset
+from mpramnist.Agarwal2025.trainer import LitModel_AgarwalSingle
+
+# Multi
+from mpramnist.Agarwal2025.dataset import AgarwalMultiDataset
+from mpramnist.Agarwal2025.trainer import LitModel_AgarwalMulti
+
+import mpramnist.transforms as t
+
+from torch.utils.data import DataLoader
 ```
 
 ### 2) Initialize trannsforms
 
 ```python
 
-    # Constant flank required for each sequence
-    constant_left_flank = AgarwalDataset.CONSTANT_LEFT_FLANK 
-    constant_right_flank = AgarwalDatase.CONSTANT_RIGHT_FLANK  
+# required for each sequence. flanks from original study
+constant_left_flank = AgarwalDataset.CONSTANT_LEFT_FLANK 
+constant_right_flank = AgarwalDatase.CONSTANT_RIGHT_FLANK  
 
-    # These flanks are used in LegNet for shifting augmentation
-    left_flank = AgarwalDataset.LEFT_FLANK  
-    right_flank = AgarwalDataset.RIGHT_FLANK
+# original flanks from human MPRAlegnet. Using for shifting augmentation
+left_flank = AgarwalDataset.LEFT_FLANK  
+right_flank = AgarwalDataset.RIGHT_FLANK
 
-    # Training transform with augmentations
-    transform = t.Compose(
-        [
-            t.AddFlanks(constant_left_flank, constant_rigtht_flank), # Add constant flanks
+# Training transform with augmentations
+transform = t.Compose(
+    [
+        t.AddFlanks(constant_left_flank, constant_rigtht_flank), # Add constant flanks
 
-            # Transforms for shift augmentation (use only for training)
-            t.AddFlanks("", right_flank),   # these transforms are used to the shift augmentation.
-            t.RightCrop(230, 260),          # Shift parameters are (0, len(right_flank))
-            t.LeftCrop(230, 230),           # Do not use shift augmentation for validation and test
+        # Transforms for shift augmentation (use only for training)
+        t.AddFlanks("", right_flank),   # these transforms are used to the shift augmentation.
+        t.RightCrop(230, 260),          # Shift parameters are (length, len(right_flank))
+        t.LeftCrop(230, 230),           # 
 
-            t.ReverseComplement(0.5),       # Reverse-complement augmentation (training only)
-            t.Seq2Tensor(),
-        ]
+        t.ReverseComplement(0.5),       # Reverse-complement augmentation (training only)
+        t.Seq2Tensor(),
+    ]
 ```
 
 ### 3) Dataset Creation
 
 ```python
-    # Load training data for HepG2 cell type
-    dataset = AgarwalDataset(split='train', cell_type='HepG2')
-    
-    # Load data filtered by genomic regions from BED file
-    dataset = AgarwalDataset(
-        split='train',
-        cell_type='K562',
-        transform = transform,
-        genomic_regions='path/to/regions.bed'
-    )
-    
-    # Load data excluding specific genomic regions
-    regions = [{'chrom': '1', 'start': 1000, 'end': 2000}]
-    dataset = AgarwalDataset(
-        split=[1, 2, 3],
-        cell_type='WTC11',
-        genomic_regions=regions,
-        transform = transform,
-        exclude_regions=True
-    )
+# Load training data for HepG2 cell type
+dataset = AgarwalSingleDataset(split='train', cell_type='HepG2')
+dataset = AgarwalMultiDataset(split='train', cell_type='HepG2')
 
-    val_dataset = AgarwalDataset(
-        cell_type="HepG2",
-        split=[9], # or 'val'
-        transform = validation_transform, # validation transforms should not use shift and reverse-complement
-        root="../data/",
-    )
+# Load data filtered by genomic regions from BED file
+dataset = AgarwalSingleDataset(
+    split='train',
+    cell_type='K562',
+    transform = transform,
+    genomic_regions='path/to/regions.bed'
+)
+
+# Load data excluding specific genomic regions
+regions = [{'chrom': '1', 'start': 1000, 'end': 2000}]
+dataset = AgarwalSingleDataset(
+    split=[1, 2, 3],
+    cell_type='WTC11',
+    genomic_regions=regions,
+    transform = transform,
+    exclude_regions=True
+)
+
+val_dataset = AgarwalSingleDataset(
+    cell_type="HepG2",
+    split=[9], # or 'val'
+    transform = validation_transform, # validation transforms should not use shift and reverse-complement
+    root="../data/",
+)
 ```
 
 ### 4) Dataloader Creation
 
 ```python 
-    val_loader = data.DataLoader(
-        dataset=val_dataset, batch_size=1024, shuffle=False, num_workers=16
-    )
+val_loader = DataLoader(
+    dataset=val_dataset, batch_size=1024, shuffle=False, num_workers=16
+)
 ```
 
 ## Launch Parameters
 
 ### AgarwalSingle
 ```bash
-    #MPRALegNet
-    python3 AgarwalSingle_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_legnet.tsv
-    #Malinois
-    python3 AgarwalSingle_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_malinois.tsv
-    #MPRAnn
-    python3 AgarwalSingle_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_mprann.tsv
-    #PARM
-    python3 AgarwalSingle_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_parm.tsv
+#MPRALegNet
+python3 AgarwalSingle_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_legnet.tsv
+#Malinois
+python3 AgarwalSingle_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_malinois.tsv
+#MPRAnn
+python3 AgarwalSingle_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_mprann.tsv
+#PARM
+python3 AgarwalSingle_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_parm.tsv
 ```
 
+### AgarwalMulti
 ```bash
-    #MPRALegNet
-    python3 AgarwalMulti_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_legnet.tsv
-    #Malinois
-    python3 AgarwalMulti_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_malinois.tsv
-    #MPRAnn
-    python3 AgarwalMulti_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_mprann.tsv
-    #PARM
-    python3 AgarwalMulti_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_parm.tsv
+#MPRALegNet
+python3 AgarwalMulti_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_legnet.tsv
+#Malinois
+python3 AgarwalMulti_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_malinois.tsv
+#MPRAnn
+python3 AgarwalMulti_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_mprann.tsv
+#PARM
+python3 AgarwalMulti_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_parm.tsv
 ```
 
+### Achieved Performance Using Basic Models
 
-## Original Benchmark Quality
-
-Pearson correlation, r
-
-    r = 0,83 for HepG2
-
-    r = 0,87 for K562
-
-    r = 0,79 for WTC11
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
+## AgarwalSingle
 
 Pearson correlation, r
 
-    r = 0,804 for HepG2
+| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
+|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
+| HepG2 | **0,8189** | 0,806 | 0,7736 | 0.7274 | 0.7985 | --- |
+| K562 | **0,8514** | 0,83 | 0,7901 | 0.7816 | 0.823 | --- |
+| WTC11 | **0,7354** | 0,718 | 0,6796 | 0.6254 | 0.7158 | --- |
 
-    r = 0,829 for K562
+## AgarwalMulti
 
-    r = 0,727 for WTC11
+Pearson correlation, r
+
+| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| HepG2 | 0,78 | 0,798 | 0,7633 | 0.708170 | 0.7886 | --- |
+| K562 | 0,75 | 0,759 | 0,7248 | 0.666216 | 0.755 | --- |
+| WTC11 | 0,77 | 0,77 | 0,738 | 0.690842 | 0.7658 | --- |
 
 ## Citation
 

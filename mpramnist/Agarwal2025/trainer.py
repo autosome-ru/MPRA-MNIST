@@ -23,12 +23,21 @@ class LitModel_AgarwalSingle(L.LightningModule):
     def forward(self, x):
 
         return self.model(x)
+    
+    def labels_and_predicted_unsqueeze(self, pred, targets):
+        if pred.dim() == 1:
+            pred = pred.unsqueeze(-1)  # [1076] -> [1076, 1]
+        if targets.dim() == 1:
+            targets = targets.unsqueeze(-1)  # [1076] -> [1076, 1]
+        return pred, targets
 
     def training_step(self, batch, batch_nb):
 
         X, y = batch
+        if X.ndim == 3 and X.shape[2] < X.shape[1]:
+            X = X.permute(0, 2, 1)
         y_hat = self.forward(X)
-
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
         loss = self.loss(y_hat, y)
 
         self.log(
@@ -41,7 +50,10 @@ class LitModel_AgarwalSingle(L.LightningModule):
     def validation_step(self, batch, batch_idx):
 
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
 
         loss = self.loss(y_hat, y)
 
@@ -71,7 +83,10 @@ class LitModel_AgarwalSingle(L.LightningModule):
     def test_step(self, batch, _):
 
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
 
         loss = self.loss(y_hat, y)
 
@@ -87,7 +102,10 @@ class LitModel_AgarwalSingle(L.LightningModule):
     def predict_step(self, batch, _):
 
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         pred = self.forward(x)
+        pred, y = self.labels_and_predicted_unsqueeze(pred, y) # [1076] -> [1076, 1]
 
         return {
             "predicted": pred.cpu().detach().float(),
@@ -150,6 +168,8 @@ class LitModel_AgarwalMulti(LitModel_AgarwalSingle):
     def training_step(self, batch, batch_nb):
         
         X, y = batch
+        if X.ndim == 3 and X.shape[2] < X.shape[1]:
+            X = X.permute(0, 2, 1)
         y_hat = self.forward(X)
                   
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
@@ -167,6 +187,8 @@ class LitModel_AgarwalMulti(LitModel_AgarwalSingle):
     def validation_step(self, batch, batch_idx):
 
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
@@ -239,6 +261,8 @@ class LitModel_AgarwalMulti(LitModel_AgarwalSingle):
 
     def test_step(self, batch, _):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
@@ -262,6 +286,8 @@ class LitModel_AgarwalMulti(LitModel_AgarwalSingle):
 
     def predict_step(self, batch, _):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         pred = self.forward(x)
 
         pred, y = self.labels_and_predicted_unsqueeze(pred, y) # [1076] -> [1076, 1]
