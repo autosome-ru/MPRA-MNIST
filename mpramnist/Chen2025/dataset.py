@@ -12,27 +12,28 @@ import numpy as np
 from mpramnist.mpradataset import MpraDataset
 
 
-class GuoMultiDataset(MpraDataset):
+class ChenMultiDataset(MpraDataset):
     """
-    Dataset class for Guo MPRA (Massively Parallel Reporter Assay) data.
+    Dataset class for Chen MPRA (Massively Parallel Reporter Assay) data.
     
     This class handles loading, filtering, and processing of genomic sequence data
-    from the Guo et al. study, which contains information about 2158 non-coding SNPs/variants, connected 
-    to risk for ten neuropsychiatric disorders, across  multiple cell types.
+    from the Chen et al. study, which contains information about 599 non-coding 
+    Late-onset Alzheimer's disease associated SNPs/variants, tested in 855 
+    constructs across multiple cell types.
 
-    The dataset uses human genome assembly hg19 with 0-based coordinate indexing.                         
+    The dataset uses human genome assembly hg38 with 0-based coordinate indexing.                         
     All genomic positions (start, end) follow 0-based indexing convention.
 
     Inherits from:
         MpraDataset: Base class for MPRA datasets
 
     Constants:
-        FLAG (str): Dataset identifier flag: 'Guo'
-        CELL_TYPE (dict): Mapping of elements to their corresponding cell types
+        FLAG (str): Dataset identifier flag: 'Chen'
+        CELL_TYPE (dict): Mapping of cell types to their corresponding states
 
     Examples:
         >>> # Load data for specific cell types
-        >>> dataset = GuoMultiDataset(cell_types=['AST', 'SHSY5Y.diff'])
+        >>> dataset = ChenMultiDataset(cell_types=['THP1', 'HMC3', 'Brain'])
         >>> 
         >>> # Load data with custom sequence length
         >>> dataset = GuoMultiDataset(length=145, cell_types='AST')
@@ -46,20 +47,22 @@ class GuoMultiDataset(MpraDataset):
 
     #  мб можно брать отдельно по клеткам / вместе со всеми 
     
-    FLAG = "Guo"
-
-    LEFT_FLANK = 'ACTGGCCGCTTCACTG'
-    RIGHT_FLANK = 'AGATCGGAAGAGCGTCG'
+    FLAG = "Chen"
     
     # Mapping of elements to their corresponding cell types
-    CELL_TYPES = ['AST', 'ES', 'N-D2', 'N-D4', 'N-D10', 'A-NPC', 'D283', 'D341', 'IMR.diff', 'IMR.prog', 'SHSY5Y.diff', 'SHSY5Y.prog', 'HEK293T']
-    BASE_COLUMNS = ['rowname', 'chromosome',	'position',	'ref',	'alt',	'ref_seq', 'is_mpra_daSNP',	'mpra_tissue',	'mpra_logfc_mean',	'mpra_pval_mean']
+    CELL_TYPE = {'THP1': ['all', 'aggregated', 'Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
+                 'HMC3': ['all', 'aggregated','Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
+                 'Brain': ['all', 'aggregated','Cortex', 'Hippocampus', 'Striatum']}
+
+    BASE_COLUMNS = ['RSID', 'interval_type', 'chromosome', 'pos_hg38', 'ref', 'alt', 'hg', 'snp_position', 'interval_center', 'reverse_prediction']
 
     def __init__(
         self,
         split: str = "test",
-        length: int = 145,  # length of cutted sequence
+        length: int = 227,  # length of cutted sequence
         cell_types: list[str] | str = None,
+        states: list[list[str]] = None,
+        interval_type: str = None,
         genomic_regions: Optional[Union[str, List[Dict]]] = None,
         exclude_regions: bool = False,
         transform=None,
@@ -67,7 +70,7 @@ class GuoMultiDataset(MpraDataset):
         root=None,
     ):
         """
-        Initialize the Guo MPRA dataset.
+        Initialize the Chen MPRA dataset.
         
         Attributes
         ----------
@@ -76,10 +79,16 @@ class GuoMultiDataset(MpraDataset):
             Default is "test".
         length : int, optional  
             Length of the sequence for the differential expression experiment. 
-            Must be positive integer. Default is 145.
-        cell_type : Union[list[str], str], optional
+            Must be positive integer. Default is 227.
+        cell_types : Union[list[str], str], optional
             List of cell types to filter by.
             Can be a single string or list of strings.
+        states : Union[list[list[str]], list[str]], optional
+            List of states to be used for each cell type. 
+        interval_type : str, optional
+            Type of intervals to be used from the assay.
+            Can be 'SNPCENTER' with SNP in the center
+            or 'PEAKCENTER' with open chromatin peak summit in the center.
         genomic_regions : str | List[Dict], optional
             Genomic regions to include/exclude. Can be:
             - Path to BED file
@@ -101,12 +110,15 @@ class GuoMultiDataset(MpraDataset):
         self.genomic_regions = genomic_regions
         self.exclude_regions = exclude_regions
         self.prefix = self.FLAG + "_"  # Prefix for file names
-        
-        # Validate promoter-enhancer input
-        if not ((isinstance(cell_types, str) and cell_types in self.CELL_TYPES) 
-                or
-                (isinstance(cell_types, list) and all(ct in self.CELL_TYPES for ct in cell_types))):
+
+        # validate cell types
+        if cell_types and (
+            (isinstance(cell_types, str) and (cell_types not in self.CELL_TYPE))
+            or
+            (isinstance(cell_types, list) and not all(ct in self.CELL_TYPE for ct in cell_types))
+        ):
             raise ValueError("Invalid cell type")
+        
 
         # Validate sequence length parameter
         if not isinstance(length, int) or length <= 0:
@@ -114,6 +126,17 @@ class GuoMultiDataset(MpraDataset):
                 f"Parameter 'length' must be natural integer, not {length}."
             )
         self.length = length
+
+        if cell_types:
+            if not states: 
+                raise ValueError("Provide states for every cell line")
+            states = [[state] if not isinstance(state, list) else state for state in states]
+            print(states, cell_types)
+            if len(states) != len(cell_types):
+                raise ValueError("Provide states for every cell line")
+            for state, cell_type in zip(states, cell_types):
+                if not all(st in self.CELL_TYPE[cell_type] for st in state):
+                    raise ValueError(f"Invalid states {state} for cell type {cell_type}")
 
         try:
             # Load the data file
@@ -126,7 +149,8 @@ class GuoMultiDataset(MpraDataset):
 
         # Process data - ensure proper chromosome formatting
         df.chromosome = df.chromosome.astype(str)
-        df.position = df.position.astype(int)
+        df.snp_position = df.snp_position.astype(int)
+        df.interval_center = df.interval_center.astype(int)
         self.ds = df
 
         if self.genomic_regions is None:
@@ -136,36 +160,61 @@ class GuoMultiDataset(MpraDataset):
                 # Convert single cell type to list for consistency
                 if isinstance(cell_types, str):
                     cell_types = [cell_types]
+
+                all_cells = []
                 
+                # Validate states provided for each cell type
+                if states:
+                    if len(states) != len(cell_types):
+                        raise ValueError("Provide states for every cell line")
+                    states = [[state] if not isinstance(state, list) else state for state in states]
+                    
+                    for state, cell_type in zip(states, cell_types):
+                        if not all(st in self.CELL_TYPE[cell_type] for st in state):
+                            raise ValueError(f"Invalid states {state} for cell type {cell_type}")
+                        
+                        if 'all' in state:
+                            all_cells = all_cells + [f'{cell_type}_{st}' for st in self.CELL_TYPE[cell_type] if st != 'all']
+                        else:
+                            all_cells = all_cells + [f'{cell_type}_{st}' for st in state]
+
                 # Filter rows where any of the processed cell types matches the requested cell types
-                self.ds = self.ds[[col for col in self.ds.columns if col in self.BASE_COLUMNS or any(ct in col for ct in cell_types)]]
+                self.ds = self.ds[self.BASE_COLUMNS + [f'{prefix}_{ct}' for ct in all_cells for prefix in ['logFC', 'fdr', 'pval', 'statistic']]]
 
         else:
-            
             # If self.genomic_regions is not None filter by genomic regions 
             self.ds = self.filter_by_genomic_regions(self.ds)
+
+        if interval_type:
+            if not (isinstance(interval_type, str) and interval_type in ['SNPCENTER', 'PEAKCENTER']):
+                raise ValueError(
+                    f"Invalid interval type"
+                )
+            self.ds = self.ds[self.ds['interval_type'] == interval_type].reset_index(drop = True)
         
         # Set up FASTA reference file for sequence extraction
-        fasta_file = self._setup_fasta_file()
+        hg19_path, hg38_path = self._setup_fasta_file()
 
         # Load FASTA reference genome
         try:
-            ref = pyfaidx.Fasta(fasta_file)
+            self.hg19 = pyfaidx.Fasta(hg19_path)
         except Exception as e:
-            raise IOError(f"Error loading FASTA file {fasta_file}: {str(e)}") from e
-        
-        self.ds.position = self.ds.position - 1                     # !!!! beacuse there is a shift and in origin oligos SNP is NOT in the center
+            raise IOError(f"Error loading FASTA file {hg19_path}: {str(e)}") from e
 
-        mask = self.ds.alt.str.len() == 1
-        self.ds = self.ds[mask]
+        try:
+            self.hg38 = pyfaidx.Fasta(hg38_path)
+        except Exception as e:
+            raise IOError(f"Error loading FASTA file {hg38_path}: {str(e)}") from e
         
+
         # Extract alternative sequences (with SNP/varaint)
         self.ds["seq_alt"] = self.ds.apply(
             lambda row: self.get_sequence(
-                ref_genome=ref,
+                hg=row.hg,
                 chromosome=row.chromosome,
                 length=self.length,
-                pos=row.position,
+                snp_pos=row.snp_position,
+                int_center=row.interval_center,
                 ref=row.ref,
                 alt=row.alt,
             ),
@@ -175,10 +224,11 @@ class GuoMultiDataset(MpraDataset):
         # Extract reference sequences (without variant)
         self.ds["seq_ref"] = self.ds.apply(
             lambda row: self.get_sequence(
-                ref_genome=ref,
+                hg=row.hg,
                 chromosome=row.chromosome,
                 length=self.length,
-                pos=row.position,
+                snp_pos=row.snp_position,
+                int_center=row.interval_center,
                 ref=row.ref,
                 alt=row.ref,  # Use reference allele instead of alternative
             ),
@@ -186,16 +236,19 @@ class GuoMultiDataset(MpraDataset):
         )
 
         # Identifier for split information
-        target_column = [f'logFC_{ct}' for ct in cell_types]
-        fdr_column = [f'fdr_{ct}' for ct in cell_types]
+        target_column = [f'logFC_{ct}' for ct in all_cells] if cell_types else [col for col in self.ds.columns if 'logFC' in col]
+        fdr_column = [f'fdr_{ct}' for ct in all_cells] if cell_types else [col for col in self.ds.columns if 'fdr' in col]
+        
         targets = self.ds[target_column].to_numpy()
         fdrs = self.ds[fdr_column].to_numpy()
         seq_alt = self.ds.seq_alt.to_numpy()
         seq_ref = self.ds.seq_ref.to_numpy()
+        rev_pred = self.ds.reverse_prediction.to_numpy()
 
-        self.ds = {"targets": targets, "seq": seq_ref, "seq_alt": seq_alt, "fdrs": fdrs}
+        self.ds = {"targets": targets, "seq": seq_ref, "seq_alt": seq_alt, "fdrs": fdrs, "reverse_prediction": rev_pred}
 
         self.name_for_split_info = self.prefix
+
 
     def __getitem__(self, idx):
         # Find all names start with 'seq' (e.g, 'seq', 'seq1', 'seq2', etc)
@@ -226,12 +279,13 @@ class GuoMultiDataset(MpraDataset):
 
         target = torch.tensor(self.ds["targets"][idx].astype(np.float32))
         fdr = torch.tensor(self.ds["fdrs"][idx].astype(np.float32))
+        rev_pred = torch.tensor(self.ds["reverse_prediction"][idx].astype(np.int8))
 
         if self.target_transform is not None:
             target = self.target_transform(target)
 
         if len(seqs_datasets) > 1:
-            return seqs_datasets, target, fdr  # {seq : seq, seq1 : seq1, ..., targets, fdr}
+            return seqs_datasets, target, fdr, rev_pred  # {seq : seq, seq1 : seq1, ..., targets, fdr}
         else:
             return seqs_datasets["seq"], target  # sequences, targets
 
@@ -318,14 +372,15 @@ class GuoMultiDataset(MpraDataset):
         - Uses 0-based coordinate system for sequence extraction
         """
 
-        fasta_file = os.path.join(self._data_path, "hg19.fa")
+        hg19_path = os.path.join(self._data_path, "hg19.fa")
+        hg38_path = os.path.join(self._data_path, "hg38.fa")
 
-        if not os.path.exists(fasta_file):
+        if not os.path.exists(hg19_path):
             url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz"
             try:
                 # Download and decompress
-                subprocess.run(["wget", url, "-O", f"{fasta_file}.gz"], check=True)
-                subprocess.run(["gunzip", fasta_file + ".gz"], check=True)
+                subprocess.run(["wget", url, "-O", f"{hg19_path}.gz"], check=True)
+                subprocess.run(["gunzip", hg19_path + ".gz"], check=True)
             except subprocess.CalledProcessError as e:
                 raise IOError(
                     f"Failed to download/decompress FASTA file: {str(e)}"
@@ -334,24 +389,40 @@ class GuoMultiDataset(MpraDataset):
             # print("FASTA file already exists. Skipping download.")
             pass
 
-        return fasta_file
+        if not os.path.exists(hg38_path):
+            url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz"
+            try:
+                # Download and decompress
+                subprocess.run(["wget", url, "-O", f"{hg38_path}.gz"], check=True)
+                subprocess.run(["gunzip", hg38_path + ".gz"], check=True)
+            except subprocess.CalledProcessError as e:
+                raise IOError(
+                    f"Failed to download/decompress FASTA file: {str(e)}"
+                ) from e
+        else:
+            # print("FASTA file already exists. Skipping download.")
+            pass
+
+        return hg19_path, hg38_path
 
     def get_sequence(
-        self, ref_genome, chromosome: str, length: int, pos: int, ref: str, alt: str
+        self, hg: str, chromosome: str, length: int, snp_pos: int, int_center: int, ref: str, alt: str
     ) -> str:
         """
         Extract sequence from a FASTA file with padding to a fixed length.
 
         Parameters
         ----------
-        ref_genome : pyfaidx.Fasta
-            FASTA file object for sequence extraction
+        hg : str
+            genome version to get the sequence (hg38 or hg19)
         chromosome : str
             Chromosome name (without 'chr' prefix, will be added automatically)
         length : int
             Total length of sequence to extract
-        pos : int
-            Variant position (0-based, hg38)
+        snp_pos : int
+            Variant position (0-based)
+        int_cnter: int
+            Interval center position (0-based)
         ref : str
             Reference allele (single character)
         alt : str
@@ -370,8 +441,8 @@ class GuoMultiDataset(MpraDataset):
 
         Notes
         -----
-        - Uses hg19 reference genome with 0-based coordinates
-        - Sequences are centered on the variant position
+        - Uses hg19 or hg38 reference genome with 0-based coordinates
+        - Sequences are centered on the interval center
         - Handles both substitutions and deletions
         - For deletions, the sequence length is maintained by removing the deleted base
         """
@@ -381,25 +452,37 @@ class GuoMultiDataset(MpraDataset):
                 f"Reference nucleotide should be single character, got {ref}"
             )
 
-        # Verify reference nucleotide matches expected
-        observed_ref = str(ref_genome[chromosome][pos : pos+1]).upper()
-        if observed_ref != ref.upper():
-            return None
+        if hg == 'hg38':
+            ref_genome = self.hg38
+        elif hg == 'hg19':
+            ref_genome = self.hg19
+        else:
+            raise ValueError(
+                f'Invalid genome version (must be hg38 or hg19)'
+            )
 
         half_len = length // 2
         
         if length % 2 == 1:  
-            start = pos - half_len
-            end = pos + half_len + 1
-            ref_pos_in_seq = half_len  
+            start = int_center - half_len - 1
+            end = int_center + half_len 
+            ref_pos_in_seq = snp_pos - start 
         else:  
-            start = pos - half_len
-            end = pos + half_len
-            ref_pos_in_seq = half_len
+            start = int_center - half_len
+            end = int_center + half_len
+            ref_pos_in_seq = snp_pos - start
+
+        if snp_pos < start or snp_pos > end:  # the SNP lies OUTSIDE of the interval 
+            return None
+
+        # Verify reference nucleotide matches expected
+        observed_ref = str(ref_genome[chromosome][snp_pos-1 : snp_pos]).upper()
+        if observed_ref != ref.upper():
+            raise ValueError(
+                        f"no matching: expected {observed_ref}, found {ref}"
+                            )
 
         try:
-            ref_pos_in_seq = half_len
-
             if alt == "-":
                 # Handle deletion
                 seq = str(ref_genome[chromosome][start : end + 1])
@@ -412,7 +495,7 @@ class GuoMultiDataset(MpraDataset):
             return modified_seq.upper()
         except Exception as e:
             raise ValueError(
-                f"Error processing {chromosome}:{pos}-{ref}>{alt}: {str(e)}"
+                f"Error processing {chromosome}:{snp_pos}-{ref}>{alt}: {str(e)}"
             ) from e
 
 
@@ -421,52 +504,58 @@ class GuoMultiDataset(MpraDataset):
 
 
 
-class GuoSingleDataset(MpraDataset):
+class ChenSingleDataset(MpraDataset):
     """
-    Dataset class for Guo MPRA (Massively Parallel Reporter Assay) data.
+    Dataset class for Chen MPRA (Massively Parallel Reporter Assay) data.
     
     This class handles loading, filtering, and processing of genomic sequence data
-    from the Guo et al. study, which contains information about 2158 non-coding SNPs/variants, connected
-    to risk for ten neuropsychiatric disorders, across  multiple cell types.
+    from the Chen et al. study, which contains information about 599 non-coding 
+    Late-onset Alzheimer's disease associated SNPs/variants, tested in 855 
+    constructs across multiple cell types.
 
-    The dataset uses human genome assembly hg19 with 0-based coordinate indexing.                         
+    The dataset uses human genome assembly hg38 and hg19 with 0-based coordinate indexing.                         
     All genomic positions (start, end) follow 0-based indexing convention.
 
     Inherits from:
         MpraDataset: Base class for MPRA datasets
 
     Constants:
-        FLAG (str): Dataset identifier flag: 'Guo'
-        CELL_TYPE (dict): Mapping of elements to their corresponding cell types
+        FLAG (str): Dataset identifier flag: 'Chen'
+        CELL_TYPE (dict): Mapping of cell types to their corresponding states
 
     Examples:
-        >>> # Load data for specific cell types
-        >>> dataset = GuoSingleDataset(cell_type='AST')
+        >>> # Load data for specific cell type
+        >>> dataset = ChenSingleDataset(cell_type='THP1')
+        >>> 
+        >>> # Load data for specific cell type and state
+        >>> dataset = ChenSingleDataset(cell_type='INFG')
         >>> 
         >>> # Load data with custom sequence length
-        >>> dataset = GuoSingleDataset(length=145, cell_type='AST')
+        >>> dataset = ChenSingleDataset(length=145, cell_type='THP1')
         >>> 
         >>> # Load data filtered by genomic regions
-        >>> dataset = KircheGuoSingleDatasetrDataset(
+        >>> dataset = ChenSingleDataset(
         ...     genomic_regions='path/to/regions.bed',
-        ...     cell_type='AST']
+        ...     cell_type='THP1']
         ... )
     """
     
-    FLAG = "Guo"
-
-    LEFT_FLANK = 'ACTGGCCGCTTCACTG'
-    RIGHT_FLANK = 'AGATCGGAAGAGCGTCG'
+    FLAG = "Chen"
     
     # Mapping of elements to their corresponding cell types
-    CELL_TYPES = ['AST', 'ES', 'N-D2', 'N-D4', 'N-D10', 'A-NPC', 'D283', 'D341', 'IMR.diff', 'IMR.prog', 'SHSY5Y.diff', 'SHSY5Y.prog', 'HEK293T']
-    BASE_COLUMNS = ['rowname', 'chromosome',	'position',	'ref',	'alt',	'ref_seq', 'is_mpra_daSNP',	'mpra_tissue',	'mpra_logfc_mean',	'mpra_pval_mean']
+    CELL_TYPES = {'THP1': ['aggregated', 'Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
+                 'HMC3': ['aggregated','Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
+                 'Brain': ['aggregated','Cortex', 'Hippocampus', 'Striatum']}
+
+    BASE_COLUMNS = ['RSID', 'interval_type', 'chromosome', 'pos_hg38', 'ref', 'alt', 'hg', 'snp_position', 'interval_center', 'reverse_prediction']
 
     def __init__(
         self,
         cell_type: str,
         split: str = "test",
         length: int = 145,  # length of cutted sequence
+        state: str = 'aggregated',
+        interval_type: str = None,
         genomic_regions: Optional[Union[str, List[Dict]]] = None,
         exclude_regions: bool = False,
         transform=None,
@@ -474,7 +563,7 @@ class GuoSingleDataset(MpraDataset):
         root=None,
     ):
         """
-        Initialize the Guo MPRA dataset.
+        Initialize the Chen MPRA dataset.
         
         Attributes
         ----------
@@ -483,9 +572,16 @@ class GuoSingleDataset(MpraDataset):
             Default is "test".
         length : int, optional  
             Length of the sequence for the differential expression experiment. 
-            Must be positive integer. Default is 145.
-        cell_type : str, optional
-            Cell type to be used. 
+            Must be positive integer. Default is 227.
+        cell_type : str
+            List of cell types to filter by.
+            Can be a single string or list of strings.
+        state : str, optional
+            List of states to be used for each cell type. 
+        interval_type : str, optional
+            Type of intervals to be used from the assay.
+            Can be 'SNPCENTER' with SNP in the center
+            or 'PEAKCENTER' with open chromatin peak summit in the center.
         genomic_regions : str | List[Dict], optional
             Genomic regions to include/exclude. Can be:
             - Path to BED file
@@ -512,16 +608,20 @@ class GuoSingleDataset(MpraDataset):
         if not (isinstance(cell_type, str) and cell_type in self.CELL_TYPES):
             raise ValueError("Invalid cell type")
 
+        if not (isinstance(state, str) and state in self.CELL_TYPES[cell_type]):
+            raise ValueError(f"Invalid state for {cell_type}")
+
         # Validate sequence length parameter
         if not isinstance(length, int) or length <= 0:
             raise ValueError(
                 f"Parameter 'length' must be natural integer, not {length}."
             )
+        
         self.length = length
 
         try:
             # Load the data file
-            file_name = self.prefix + "_" + cell_type + ".tsv"
+            file_name = self.prefix + "_" + cell_type + '_' + state + ".tsv"
             self.download(self._data_path, file_name)
             file_path = os.path.join(self._data_path, file_name)
             df = pd.read_csv(file_path, sep="\t")
@@ -529,34 +629,43 @@ class GuoSingleDataset(MpraDataset):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         # Process data - ensure proper chromosome formatting
-        df.chrom = df.chrom.astype(str)
-        df.pos = df.pos.astype(int)
-        self.ds = df #.dropna().reset_index(drop=True)
+        df.chromosome = df.chromosome.astype(str)
+        df.snp_position = df.snp_position.astype(int)
+        df.interval_center = df.interval_center.astype(int)
+        self.ds = df
 
         if self.genomic_regions is not None:
             self.ds = self.filter_by_genomic_regions(self.ds)
         
+        if interval_type:
+            if not (isinstance(interval_type, str) and interval_type in ['SNPCENTER', 'PEAKCENTER']):
+                raise ValueError(
+                    f"Invalid interval type"
+                )
+            self.ds = self.ds[self.ds['interval_type'] == interval_type].reset_index(drop = True)
+        
         # Set up FASTA reference file for sequence extraction
-        fasta_file = self._setup_fasta_file()
+        hg19_path, hg38_path = self._setup_fasta_file()
 
         # Load FASTA reference genome
         try:
-            ref = pyfaidx.Fasta(fasta_file)
+            self.hg19 = pyfaidx.Fasta(hg19_path)
         except Exception as e:
-            raise IOError(f"Error loading FASTA file {fasta_file}: {str(e)}") from e
-        
-        self.ds.pos = self.ds.pos - 1                     
+            raise IOError(f"Error loading FASTA file {hg19_path}: {str(e)}") from e
 
-        mask = self.ds.alt.str.len() == 1
-        self.ds = self.ds[mask]
-        
+        try:
+            self.hg38 = pyfaidx.Fasta(hg38_path)
+        except Exception as e:
+            raise IOError(f"Error loading FASTA file {hg38_path}: {str(e)}") from e
+
         # Extract alternative sequences (with SNP/varaint)
         self.ds["seq_alt"] = self.ds.apply(
             lambda row: self.get_sequence(
-                ref_genome=ref,
-                chromosome=row.chrom,
+                hg=row.hg,
+                chromosome=row.chromosome,
                 length=self.length,
-                pos=row.pos,
+                snp_pos=row.snp_position,
+                int_center=row.interval_center,
                 ref=row.ref,
                 alt=row.alt,
             ),
@@ -566,10 +675,11 @@ class GuoSingleDataset(MpraDataset):
         # Extract reference sequences (without variant)
         self.ds["seq_ref"] = self.ds.apply(
             lambda row: self.get_sequence(
-                ref_genome=ref,
-                chromosome=row.chrom,
+                hg=row.hg,
+                chromosome=row.chromosome,
                 length=self.length,
-                pos=row.pos,
+                snp_pos=row.snp_position,
+                int_center=row.interval_center,
                 ref=row.ref,
                 alt=row.ref,  # Use reference allele instead of alternative
             ),
@@ -583,11 +693,11 @@ class GuoSingleDataset(MpraDataset):
         fdrs = self.ds[fdr_column].to_numpy()
         seq_alt = self.ds.seq_alt.to_numpy()
         seq_ref = self.ds.seq_ref.to_numpy()
+        rev_pred = self.ds.reverse_prediction.to_numpy()
 
-        self.ds = {"targets": targets, "seq": seq_ref, "seq_alt": seq_alt, "fdrs": fdrs}
+        self.ds = {"targets": targets, "seq": seq_ref, "seq_alt": seq_alt, "fdrs": fdrs, "reverse_prediction": rev_pred}
 
         self.name_for_split_info = self.prefix
-
     def __getitem__(self, idx):
         # Find all names start with 'seq' (e.g, 'seq', 'seq1', 'seq2', etc)
         seq_keys = [key for key in self.ds.keys() if key.startswith("seq")]
@@ -617,12 +727,13 @@ class GuoSingleDataset(MpraDataset):
 
         target = torch.tensor(self.ds["targets"][idx].astype(np.float32))
         fdr = torch.tensor(self.ds["fdrs"][idx].astype(np.float32))
+        rev_pred = torch.tensor(self.ds["reverse_prediction"][idx].astype(np.int8))
 
         if self.target_transform is not None:
             target = self.target_transform(target)
 
         if len(seqs_datasets) > 1:
-            return seqs_datasets, target, fdr  # {seq : seq, seq1 : seq1, ..., targets, fdr}
+            return seqs_datasets, target, fdr, rev_pred  # {seq : seq, seq1 : seq1, ..., targets, fdr}
         else:
             return seqs_datasets["seq"], target  # sequences, targets
 
@@ -709,14 +820,15 @@ class GuoSingleDataset(MpraDataset):
         - Uses 0-based coordinate system for sequence extraction
         """
 
-        fasta_file = os.path.join(self._data_path, "hg19.fa")
+        hg19_path = os.path.join(self._data_path, "hg19.fa")
+        hg38_path = os.path.join(self._data_path, "hg38.fa")
 
-        if not os.path.exists(fasta_file):
+        if not os.path.exists(hg19_path):
             url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz"
             try:
                 # Download and decompress
-                subprocess.run(["wget", url, "-O", f"{fasta_file}.gz"], check=True)
-                subprocess.run(["gunzip", fasta_file + ".gz"], check=True)
+                subprocess.run(["wget", url, "-O", f"{hg19_path}.gz"], check=True)
+                subprocess.run(["gunzip", hg19_path + ".gz"], check=True)
             except subprocess.CalledProcessError as e:
                 raise IOError(
                     f"Failed to download/decompress FASTA file: {str(e)}"
@@ -725,24 +837,41 @@ class GuoSingleDataset(MpraDataset):
             # print("FASTA file already exists. Skipping download.")
             pass
 
-        return fasta_file
+        if not os.path.exists(hg38_path):
+            url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz"
+            try:
+                # Download and decompress
+                subprocess.run(["wget", url, "-O", f"{hg38_path}.gz"], check=True)
+                subprocess.run(["gunzip", hg38_path + ".gz"], check=True)
+            except subprocess.CalledProcessError as e:
+                raise IOError(
+                    f"Failed to download/decompress FASTA file: {str(e)}"
+                ) from e
+        else:
+            # print("FASTA file already exists. Skipping download.")
+            pass
+
+        return hg19_path, hg38_path
+
 
     def get_sequence(
-        self, ref_genome, chromosome: str, length: int, pos: int, ref: str, alt: str
+        self, hg: str, chromosome: str, length: int, snp_pos: int, int_center: int, ref: str, alt: str
     ) -> str:
         """
         Extract sequence from a FASTA file with padding to a fixed length.
 
         Parameters
         ----------
-        ref_genome : pyfaidx.Fasta
-            FASTA file object for sequence extraction
+        hg : str
+            genome version to get the sequence (hg38 or hg19)
         chromosome : str
             Chromosome name (without 'chr' prefix, will be added automatically)
         length : int
             Total length of sequence to extract
-        pos : int
-            Variant position (0-based, hg38)
+        snp_pos : int
+            Variant position (0-based)
+        int_cnter: int
+            Interval center position (0-based)
         ref : str
             Reference allele (single character)
         alt : str
@@ -761,8 +890,8 @@ class GuoSingleDataset(MpraDataset):
 
         Notes
         -----
-        - Uses hg19 reference genome with 0-based coordinates
-        - Sequences are centered on the variant position
+        - Uses hg19 or hg38 reference genome with 0-based coordinates
+        - Sequences are centered on the interval center
         - Handles both substitutions and deletions
         - For deletions, the sequence length is maintained by removing the deleted base
         """
@@ -772,25 +901,37 @@ class GuoSingleDataset(MpraDataset):
                 f"Reference nucleotide should be single character, got {ref}"
             )
 
-        # Verify reference nucleotide matches expected
-        observed_ref = str(ref_genome[chromosome][pos : pos+1]).upper()
-        if observed_ref != ref.upper():
-            return None
+        if hg == 'hg38':
+            ref_genome = self.hg38
+        elif hg == 'hg19':
+            ref_genome = self.hg19
+        else:
+            raise ValueError(
+                f'Invalid genome version (must be hg38 or hg19)'
+            )
 
         half_len = length // 2
         
         if length % 2 == 1:  
-            start = pos - half_len
-            end = pos + half_len + 1
-            ref_pos_in_seq = half_len  
+            start = int_center - half_len - 1
+            end = int_center + half_len 
+            ref_pos_in_seq = snp_pos - start 
         else:  
-            start = pos - half_len
-            end = pos + half_len
-            ref_pos_in_seq = half_len
+            start = int_center - half_len
+            end = int_center + half_len
+            ref_pos_in_seq = snp_pos - start
+
+        if snp_pos < start or snp_pos > end:  # the SNP lies OUTSIDE of the interval 
+            return None
+
+        # Verify reference nucleotide matches expected
+        observed_ref = str(ref_genome[chromosome][snp_pos-1 : snp_pos]).upper()
+        if observed_ref != ref.upper():
+            raise ValueError(
+                        f"no matching: expected {observed_ref}, found {ref}"
+                            )
 
         try:
-            ref_pos_in_seq = half_len
-
             if alt == "-":
                 # Handle deletion
                 seq = str(ref_genome[chromosome][start : end + 1])
@@ -803,5 +944,6 @@ class GuoSingleDataset(MpraDataset):
             return modified_seq.upper()
         except Exception as e:
             raise ValueError(
-                f"Error processing {chromosome}:{pos}-{ref}>{alt}: {str(e)}"
+                f"Error processing {chromosome}:{snp_pos}-{ref}>{alt}: {str(e)}"
             ) from e
+

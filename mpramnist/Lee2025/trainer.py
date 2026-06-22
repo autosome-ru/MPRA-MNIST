@@ -5,7 +5,7 @@ import numpy as np
 
 from torchmetrics import PearsonCorrCoef
 
-class LitModel_Guo(L.LightningModule):
+class LitModel_Lee(L.LightningModule):
     def __init__(self, model, loss, print_each, weight_decay=1e-2, lr=3e-4, use_one_cycle=False):
         super().__init__()
 
@@ -92,7 +92,7 @@ class LitModel_Guo(L.LightningModule):
         self.test_pearson.reset()
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        seqs, labels, fdrs = batch
+        seqs, labels, var_type, rev_pred = batch
 
         if isinstance(seqs, dict):
             seq_x = seqs.get("seq")
@@ -109,7 +109,8 @@ class LitModel_Guo(L.LightningModule):
             "ref_predicted": ref_pred.cpu().detach().float(),
             "alt_predicted": alt_pred.cpu().detach().float(),
             "target": labels.cpu().detach().float(),
-            "fdr": fdrs.cpu().detach().float(),
+            "variant_type": var_type.cpu().detach().float(),
+            "reverse_prediction": rev_pred.cpu().detach().float(),
                 }
 
         return result
