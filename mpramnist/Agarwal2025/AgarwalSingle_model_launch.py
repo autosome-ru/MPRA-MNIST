@@ -16,6 +16,8 @@ from mpramnist.models import L1KLmixed
 from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
+
+from mpramnist.models import DREAM_RNN
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -161,6 +163,9 @@ for run in list(range(args.runs)):
         elif args.model == "PARM":
             model = PARM(n_block=5, type_loss="mse", output_dim=1)
             loss =nn.MSELoss()
+        elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+            model = DREAM_RNN(len(train_dataset[0][0]), 230, 1)
+            loss = nn.MSELoss()
 
         seq_model = LitModel_AgarwalSingle(model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1)
 

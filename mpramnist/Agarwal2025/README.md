@@ -34,7 +34,7 @@ After filtering elements (as described in the original methodology), the final p
 
 All sequences are **200 nucleotides long** (excluding constant 15-nt flanks). Data is split into training, validation, and test sets using an 8:1:1 ratio, following the original study.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/AgarwalDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Agarwal2025/AgarwalDataset_example.ipynb) for detailed usage example and training
 
 ## Tasks
 
@@ -82,7 +82,7 @@ ENSG00000003056	12	9102102.0	9102302.0	-	12	8949506	8949706	-	GGGGTCTGGTGGGAGGAG
 
 **Column descriptions:**
 *   `HepG2_Specificity_Score`, `K562_Specificity_Score`, `WTC11_Specificity_Score` : Mean normalized activity across 3 replicates for the individual sequence for current cell type
-*   `HepG2_log2`, `K562_log2`, `WTC11_log2` : Raw activity values
+*   `HepG2_log2`, `K562_log2`, `WTC11_log2` : Raw activity values *log₂(RNA reads / DNA reads)*
 *   `fold`: Cross-validation fold (1-10)
 
 ## AgarwalSingle Parameters
@@ -164,7 +164,7 @@ Switch to False to use the raw activity instead of the specificity score.
 
 6) **Specificity score for AgarwalMulti:** The authors defined specificity as the deviation of each element's activity from its mean across all cell types, highlighting cell‑type‑specific signals. Setting `use_specificity_score` parameter to False instead returns the raw activity values, computed as the log2‑ratio of RNA reads to DNA reads for each element. For all MPRA-MNIST computations we used `use_specificity_score`=True.
 
-7) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/AgarwalDataset_example.ipynb) for detailed usage example and training
+7) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Agarwal2025/AgarwalDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
@@ -264,6 +264,8 @@ python3 AgarwalSingle_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoc
 python3 AgarwalSingle_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_mprann.tsv
 #PARM
 python3 AgarwalSingle_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_parm.tsv
+#DREAM-RNN
+python3 AgarwalSingle_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalsingle_dream_rnn.tsv
 ```
 
 ### AgarwalMulti
@@ -276,29 +278,31 @@ python3 AgarwalMulti_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch
 python3 AgarwalMulti_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_mprann.tsv
 #PARM
 python3 AgarwalMulti_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_parm.tsv
+#DREAM-RNN
+python3 AgarwalMulti_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 K562 WTC11 --result_dir ./Agarwalmulti_dream_rnn.tsv
 ```
 
-### Achieved Performance Using Basic Models
+## Achieved Performance Using Basic Models
 
-## AgarwalSingle
+### AgarwalSingle
 
 Pearson correlation, r
 
 | Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
 |-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
-| HepG2 | **0,8189** | 0,806 | 0,7736 | 0.7274 | 0.7985 | --- |
-| K562 | **0,8514** | 0,83 | 0,7901 | 0.7816 | 0.823 | --- |
-| WTC11 | **0,7354** | 0,718 | 0,6796 | 0.6254 | 0.7158 | --- |
+| HepG2 | **0,8189** | 0,806 | 0,7736 | 0.7274 | 0.7985 | 0.7767 |
+| K562 | **0,8514** | 0,83 | 0,7901 | 0.7816 | 0.823 | 0.8012 |
+| WTC11 | **0,7354** | 0,718 | 0,6796 | 0.6254 | 0.7237 | 0.6724 |
 
-## AgarwalMulti
+### AgarwalMulti
 
 Pearson correlation, r
 
 | Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
 |-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
-| HepG2 | 0,78 | 0,798 | 0,7633 | 0.708170 | 0.7886 | --- |
-| K562 | 0,75 | 0,759 | 0,7248 | 0.666216 | 0.755 | --- |
-| WTC11 | 0,77 | 0,77 | 0,738 | 0.690842 | 0.7658 | --- |
+| HepG2 | 0,78 | **0,798** | 0,7633 | 0.708170 | 0.7886 | 0.742 |
+| K562 | 0,75 | **0,759** | 0,7248 | 0.666216 | 0.755 | 0.6883 |
+| WTC11 | 0,77 | **0,77** | 0,738 | 0.690842 | 0.7658 | 0.7034 |
 
 ## Citation
 
