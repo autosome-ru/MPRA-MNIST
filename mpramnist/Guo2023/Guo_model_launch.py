@@ -19,6 +19,8 @@ from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
 
+from mpramnist.models import DREAM_RNN
+
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -188,6 +190,10 @@ for run in list(range(args.runs)):
     elif args.model == "PARM":
         model = PARM(n_block=5, type_loss="mse", output_dim=len(args.cell_types_train))
         loss =nn.MSELoss()
+    
+    elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+        model = DREAM_RNN(in_channels=len(train_dataset_own[0][0]), seqsize=600, out_channels=len(args.cell_types))
+        loss = nn.MSELoss()
 
     seq_model = LitModel_Guo(model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1, use_one_cycle=use_one_cycle)
 

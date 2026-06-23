@@ -33,26 +33,29 @@ class ChenMultiDataset(MpraDataset):
 
     Examples:
         >>> # Load data for specific cell types
-        >>> dataset = ChenMultiDataset(cell_types=['THP1', 'HMC3', 'Brain'])
+        >>> dataset = ChenMultiDataset(cell_types=['THP1', 'HMC3'])
+        >>> 
+        >>> # Load data for specific cell types and states
+        >>> dataset = ChenMultiDataset(cell_types=['THP1', 'HMC3'], 
+        >>>                                 states = ['IFNB', 'IFNG'])
         >>> 
         >>> # Load data with custom sequence length
-        >>> dataset = GuoMultiDataset(length=145, cell_types='AST')
+        >>> dataset = GuoMultiDataset(length=200, cell_types='Brain', states='Cortex')
         >>> 
         >>> # Load data filtered by genomic regions
         >>> dataset = GuoMultiDataset(
         ...     genomic_regions='path/to/regions.bed',
-        ...     cell_types=['AST', 'SHSY5Y.diff']
+        ...     cell_types='Brain',
+        ...     targets='Cortex'
         ... )
     """
-
-    #  мб можно брать отдельно по клеткам / вместе со всеми 
     
     FLAG = "Chen"
     
     # Mapping of elements to their corresponding cell types
-    CELL_TYPE = {'THP1': ['all', 'aggregated', 'Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
-                 'HMC3': ['all', 'aggregated','Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
-                 'Brain': ['all', 'aggregated','Cortex', 'Hippocampus', 'Striatum']}
+    CELL_TYPE = {'THP1': ['aggregated', 'Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
+                 'HMC3': ['aggregated','Naive', 'IFNB', 'IFNG', 'LPSIFNG'],
+                 'Brain': ['aggregated','Cortex', 'Hippocampus', 'Striatum']}
 
     BASE_COLUMNS = ['RSID', 'interval_type', 'chromosome', 'pos_hg38', 'ref', 'alt', 'hg', 'snp_position', 'interval_center', 'reverse_prediction']
 
@@ -129,9 +132,8 @@ class ChenMultiDataset(MpraDataset):
 
         if cell_types:
             if not states: 
-                raise ValueError("Provide states for every cell line")
+                states = [['all'] * len(cell_types)]
             states = [[state] if not isinstance(state, list) else state for state in states]
-            print(states, cell_types)
             if len(states) != len(cell_types):
                 raise ValueError("Provide states for every cell line")
             for state, cell_type in zip(states, cell_types):
@@ -174,7 +176,7 @@ class ChenMultiDataset(MpraDataset):
                             raise ValueError(f"Invalid states {state} for cell type {cell_type}")
                         
                         if 'all' in state:
-                            all_cells = all_cells + [f'{cell_type}_{st}' for st in self.CELL_TYPE[cell_type] if st != 'all']
+                            all_cells = all_cells + [f'{cell_type}_{st}' for st in self.CELL_TYPE[cell_type]]
                         else:
                             all_cells = all_cells + [f'{cell_type}_{st}' for st in state]
 
@@ -553,7 +555,7 @@ class ChenSingleDataset(MpraDataset):
         self,
         cell_type: str,
         split: str = "test",
-        length: int = 145,  # length of cutted sequence
+        length: int = 227,  # length of cutted sequence
         state: str = 'aggregated',
         interval_type: str = None,
         genomic_regions: Optional[Union[str, List[Dict]]] = None,

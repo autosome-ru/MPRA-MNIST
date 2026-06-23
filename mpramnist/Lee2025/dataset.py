@@ -43,7 +43,7 @@ class LeeDataset(MpraDataset):
     
     FLAG = "Lee"
 
-    VARIANT_TYPE_MAPPING = {'emVar': 1, 'MPRA-Allelic': 2, 'MPRA-nonallelic': 3}
+    VARIANT_TYPE_MAPPING = {'emVar': 1, 'MPRA-Allelic': 2, 'MPRA-nonallelic': 3, 'Uncertain': 4}
 
     def __init__(
         self,
@@ -210,8 +210,8 @@ class LeeDataset(MpraDataset):
         ----------
         df : pd.DataFrame
             Input dataframe containing genomic data with columns:
-            - 'chromosome': chromosome name (hg19)
-            - 'position': variant position (0-based, hg19)
+            - 'chromosome': chromosome name (hg38)
+            - 'position': variant position (0-based, hg38)
 
         Returns
         -------

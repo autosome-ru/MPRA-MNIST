@@ -22,6 +22,8 @@ class LitModel_Lee(L.LightningModule):
 
         self.use_one_cycle = use_one_cycle
 
+        VARIANT_TYPE_MAPPING = {1: 'emVar', 2: 'MPRA-Allelic', 3: 'MPRA-nonallelic', 4: 'Uncertain'}
+
     def labels_and_predicted_unsqueeze(self, pred, targets):
         if pred.dim() == 1:
             pred = pred.unsqueeze(-1)  # [1076] -> [1076, 1]
@@ -109,7 +111,7 @@ class LitModel_Lee(L.LightningModule):
             "ref_predicted": ref_pred.cpu().detach().float(),
             "alt_predicted": alt_pred.cpu().detach().float(),
             "target": labels.cpu().detach().float(),
-            "variant_type": var_type.cpu().detach().float(),
+            "variant_type": var_type.cpu().detach().int(),
             "reverse_prediction": rev_pred.cpu().detach().float(),
                 }
 

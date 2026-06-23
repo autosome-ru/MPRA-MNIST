@@ -448,8 +448,8 @@ INFO = {
     "Lee": {
         "python_class": "Lee2025",
         "description": "",
-        "url_Lee_SNP.tsv": "https://zenodo.org/records/20787756/files/Lee_SNP.tsv?download=1", 
-        "MD5_Lee_SNP.tsv": "75c3784c587a80c2dcdcf9936812bf96",
+        "url_Lee_SNP.tsv": "https://zenodo.org/records/20819473/files/Lee_SNP.tsv?download=1", 
+        "MD5_Lee_SNP.tsv": "d4e652ff8b095011c550619fe48432ab",
         "task": "Regression",
     },
     "Chen": {
