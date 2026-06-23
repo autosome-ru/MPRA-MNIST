@@ -16,6 +16,8 @@ from mpramnist.models import L1KLmixed
 from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
+
+from mpramnist.models import DREAM_RNN
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -128,9 +130,9 @@ for run in list(range(args.runs)):
     val_dataset_own = GosaiDataset(split="val", filtration="own", cell_types=args.cell_types, stderr_columns=std_err, stderr_threshold=1.0, std_multiple_cut=6.0, up_cutoff_move=3.0, transform=val_test_transform, root=args.root)
     test_dataset_own = GosaiDataset(split="test", filtration="own", cell_types=args.cell_types, stderr_columns=std_err, stderr_threshold=1.0, std_multiple_cut=6.0, up_cutoff_move=3.0, transform=val_test_transform, root=args.root)
 
-    train_loader = DataLoader(dataset=train_dataset_own, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-    val_loader = DataLoader(dataset=val_dataset_own, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
-    test_loader = DataLoader(dataset=test_dataset_own, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    train_loader = DataLoader(dataset=train_dataset_own, batch_size=args.batch_size, shuffle=True, pin_memory=True, prefetch_factor=4, num_workers=args.num_workers)
+    val_loader = DataLoader(dataset=val_dataset_own, batch_size=args.batch_size, shuffle=False, pin_memory=True, prefetch_factor=4, num_workers=args.num_workers)
+    test_loader = DataLoader(dataset=test_dataset_own, batch_size=args.batch_size, shuffle=False, pin_memory=True, prefetch_factor=4, num_workers=args.num_workers)
 
     use_one_cycle = True
     if args.model == "MPRALegNet":
@@ -155,6 +157,9 @@ for run in list(range(args.runs)):
     elif args.model == "PARM":
         model = PARM(n_block=5, type_loss="mse", output_dim=len(args.cell_types))
         loss =nn.MSELoss()
+    elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+            model = DREAM_RNN(in_channels=len(train_dataset_own[0][0]), seqsize=600, out_channels=len(args.cell_types))
+            loss = nn.MSELoss()
 
     seq_model = LitModel_Gosai(model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, cell_types=args.cell_types, print_each=1, use_one_cycle=use_one_cycle)
 
