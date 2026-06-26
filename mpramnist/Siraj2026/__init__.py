@@ -1,4 +1,4 @@
-from .dataset import SirajMPRADataset, SirajSATMUTDataset
+from .dataset import SirajMPRADataset, SirajSatMutDataset
 from .trainer import LitModel_Siraj
 
-__all__ = ["SirajMPRADataset", "SirajSATMUTDataset", "LitModel_Siraj"]
+__all__ = ["SirajMPRADataset", "SirajSatMutDataset", "LitModel_Siraj"]

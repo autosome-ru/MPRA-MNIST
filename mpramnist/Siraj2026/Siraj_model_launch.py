@@ -5,7 +5,7 @@ import pandas as pd
 
 # Single
 from mpramnist.Agarwal2025.dataset import AgarwalSingleDataset
-from mpramnist.Siraj2026.dataset import SirajDataset
+from mpramnist.Siraj2026.dataset import SirajMPRADataset, SirajSatMutDataset
 
 from mpramnist.Siraj2026.trainer import LitModel_Siraj
 
