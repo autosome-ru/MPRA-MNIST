@@ -5,7 +5,7 @@ import pandas as pd
 
 # Single
 from mpramnist.Agarwal2025.dataset import AgarwalSingleDataset
-from mpramnist.Siraj2026.dataset import SirajMPRADataset, SirajSatMutDataset
+from mpramnist.Siraj2026.dataset import SirajMPRADataset
 
 from mpramnist.Siraj2026.trainer import LitModel_Siraj
 
@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser()
 
 general = parser.add_argument_group("general args", "general_argumens")
 
-general.add_argument("--result_dir", type=str, default="./Siraj.tsv")
+general.add_argument("--result_dir", type=str, default="./Siraj_MPRA.tsv")
 general.add_argument("--device", type=int, default=0)
 general.add_argument("--num_workers", type=int, default=103)
 general.add_argument("--runs", type=int, default=5)
@@ -221,10 +221,10 @@ for run in list(range(args.runs)):
         print_each=1,
     )
 
-    test_forw = SirajDataset(
+    test_forw = SirajMPRADataset(
         cell_type=args.cell_type, length=200, transform=forw_transform, root=args.root
     )
-    test_rev = SirajDataset(
+    test_rev = SirajMPRADataset(
         cell_type=args.cell_type, length=200, transform=rev_transform, root=args.root
     )
 

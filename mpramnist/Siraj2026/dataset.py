@@ -16,8 +16,8 @@ class SirajMPRADataset(MpraDataset):
     Dataset class for Siraj MPRA (Massively Parallel Reporter Assay) data.
 
     This class handles loading, filtering, and processing of genomic sequence data
-    from the Siraj et al. study, which contains both promoter and enhancer elements
-    across multiple cell types with SNP/variant information.
+    from the Siraj et al. study, which focuses on functional dissection of complex
+    trait variants at single-nucleotide resolution across relevant cell types.
 
     The dataset uses human genome assembly hg19 with 0-based coordinate indexing.
     All genomic positions (start, end) follow 0-based indexing convention.
@@ -34,10 +34,10 @@ class SirajMPRADataset(MpraDataset):
         >>> dataset = SirajMPRADataset(cell_type='K562')
         >>>
         >>> # Load data with custom sequence length
-        >>> dataset = SirajMPRA(cell_type='HEPG2', length=300)
+        >>> dataset = SirajMPRADataset(cell_type='HEPG2', length=300)
         >>>
         >>> # Load data filtered by genomic regions
-        >>> dataset = SirajMPRA(
+        >>> dataset = SirajMPRADataset(
         ...     cell_type='A549',
         ...     genomic_regions='path/to/regions.bed'
         ... )
@@ -343,9 +343,9 @@ class SirajMPRADataset(MpraDataset):
         pos : int
             Variant position (0-based, hg19)
         ref : str
-            Reference allele (single character)
+            Reference allele
         alt : str
-            Alternative allele (single character or '-' for deletion)
+            Alternative allele
 
         Returns
         -------
@@ -389,8 +389,8 @@ class SirajSatMutDataset(MpraDataset):
     Dataset class for Siraj SatMut (Saturation Mutagenesis MPRA) data.
 
     This class handles loading, filtering, and processing of genomic sequence data
-    from the Kircher et al. study, which contains both promoter and enhancer elements
-    across multiple cell types with SNP/variant information.
+    from the Siraj et al. study, which focuses on functional dissection of complex
+    trait variants at single-nucleotide resolution across relevant cell types.
 
     The dataset uses human genome assembly hg19 with 0-based coordinate indexing.
     All genomic positions (start, end) follow 0-based indexing convention.
@@ -400,18 +400,19 @@ class SirajSatMutDataset(MpraDataset):
 
     Constants:
         FLAG (str): Dataset identifier flag: 'Siraj'
-        CELL_TYPE (dict): Possible cell types
+        CELL_TYPE (list): Possible cell types
+        MUT_NUM (list): Possible mutation numbers
 
     Examples:
         >>> # Load data for specific cell type
-        >>> dataset = SirajMPRADataset(cell_type='K562')
+        >>> dataset = SirajSatMutDataset(cell_type='K562')
         >>>
         >>> # Load data with custom sequence length
-        >>> dataset = SirajMPRA(cell_type='HEPG2', length=300)
+        >>> dataset = SirajSatMutDataset(cell_type='HEPG2', length=300)
         >>>
         >>> # Load data filtered by genomic regions
-        >>> dataset = SirajMPRA(
-        ...     cell_type='A549',
+        >>> dataset = SirajSatMutDataset(
+        ...     cell_type='K562',
         ...     genomic_regions='path/to/regions.bed'
         ... )
     """
@@ -423,18 +424,15 @@ class SirajSatMutDataset(MpraDataset):
 
     MUT_NUM: list[int] = [1, 2]
 
-    WINDOW_CENTER: list[str] = ["wC", "wL", "wR"]
-
     def __init__(
         self,
         cell_type: str,
         mut_num: int,
         split: str = "test",
         length: int = 200,
-        window_center: list[str] | str = ["wC", "wL", "wR"],
+        log2Skew_pval: float | None = None,
         genomic_regions: Optional[Union[str, List[Dict]]] = None,
         exclude_regions: bool = False,
-        log2Skew_pval: float | None = None,
         transform=None,
         target_transform=None,
         root=None,
@@ -447,28 +445,22 @@ class SirajSatMutDataset(MpraDataset):
         cell_type : str
             Cell type to filter by.
             Must be a single string.
+        mut_num : int
+            Number of baseline mutations (1 or 2).
         split : str, optional
             Specifies how to split the data. Currently only "test" is supported.
             Default is "test".
         length : int, optional
             Length of the sequence for the differential expression experiment.
             Must be positive integer. Default is 200.
+        log2Skew_pval: float
+            Threshold p-value for log2Skew.
         genomic_regions : str | List[Dict], optional
             Genomic regions to include/exclude. Can be:
             - Path to BED file
             - List of dictionaries with 'chrom', 'start', 'end' keys
         exclude_regions : bool
             If True, exclude the specified regions instead of including them.
-        filter_not_active : bool
-            If True, exclude sequences not active in all cell lines instead of including them.
-        filter_not_emVar : bool
-            If True, exclude variants not expression-modulating in all cell lines instead of including them.
-        filter_not_active_in_cellline : bool
-            If True, exclude sequences not active in target cell line instead of including them.
-        filter_not_emVar_in_cellline : bool
-            If True, exclude variants not expression-modulating in target cell line instead of including them.
-        filter_mnp : bool
-            If True, exclude multiple nucleotide polymorphisms instead of including them.
         transform : callable, optional
             Transformation applied to each sequence object.
         target_transform : callable, optional
@@ -492,18 +484,6 @@ class SirajSatMutDataset(MpraDataset):
         else:
             raise Exception(f"Wrong cell line provided: {cell_type}")
 
-        if isinstance(window_center, str):
-            if window_center in self.WINDOW_CENTER:
-                self.window_center = [window_center]
-            else:
-                raise Exception(f"Wrong window center provided: {window_center}")
-        else:
-            self.window_center = [
-                x if x in self.WINDOW_CENTER else None for x in window_center
-            ]
-            if None in self.window_center:
-                raise Exception(f"Wrong window center provided: {window_center}")
-
         self.log2Skew_pval = log2Skew_pval
         self.transform = transform
         self.target_transform = target_transform
@@ -522,7 +502,6 @@ class SirajSatMutDataset(MpraDataset):
 
         # Process data - ensure proper chromosome formatting
         df = df.loc[df["Cell Type"] == self.cell_type]
-        df = df.loc[df["window"].isin(self.window_center)]
         df = df.loc[df["indel"].isna()]
         df = df.loc[df["oligomut"] != "m0"]
         df = df.join(
@@ -745,12 +724,20 @@ class SirajSatMutDataset(MpraDataset):
             Start position (0-based, hg19)
         end : int
             End position (0-based, hg19)
-        pos : int
-            Variant position (0-based, hg19)
-        ref : str
-            Reference allele (single character)
-        alt : str
-            Alternative allele (single character or '-' for deletion)
+        mut_num : int
+            Number of baseline mutations (1 or 2)
+        pos : Tuple[int, int]
+            Pair of variant positions (0-based, hg19)
+        ref : Tuple[str, str]
+            Pair of reference alleles (single character each)
+        alt : Tuple[str, str]
+            Pair of alternative alleles (single character each)
+        mut_pos : int
+            Target variant position (0-based, hg19)
+        mut_ref : str
+            Target reference allele (single character each)
+        mut_alt : str
+            Target alternative allele (single character each)
 
         Returns
         -------
@@ -794,5 +781,5 @@ class SirajSatMutDataset(MpraDataset):
             return mut_seq
         except Exception as e:
             raise ValueError(
-                f"Error processing {chromosome}:{pos}-{ref}>{alt}: {str(e)}"
+                f"Error processing {chromosome}:\n{pos}-{ref}>{alt}\n{mut_pos}-{mut_ref}>{mut_alt}: {str(e)}"
             ) from e
