@@ -85,18 +85,21 @@ args = parser.parse_args()
 if isinstance(args.cell_types_train, str):
     args.cell_types_train = [args.cell_types_train]
 
-if isinstance(args.cell_types_variant, str):
-    args.cell_types_variant = [args.cell_types_variant]
 
 forw_transform = t.Compose([t.AddFlanks(GosaiDataset.LEFT_FLANK, GosaiDataset.RIGHT_FLANK), t.CenterCrop(600), t.Seq2Tensor()])
 revcomp_transform = t.Compose([t.AddFlanks(GosaiDataset.LEFT_FLANK, GosaiDataset.RIGHT_FLANK), t.CenterCrop(600), t.ReverseComplement(1), t.Seq2Tensor()])
 
 MAP_VARIANTS_TYPE = {'emVar': [1], 'all_daVar': [1, 2], 'all': [1, 2, 3, 4]}
 
-def get_variant_predictions(forw_preds, revcomp_preds, variant_types = ['emVar', 'all_daVar', 'all']):
+def Lee_variants_prediction(forw_preds, revcomp_preds, variant_types = ['emVar', 'daVar', 'all'], return_df = True):
+
+    MAP_VARIANTS_TYPE = {'emVar': [1], 'daVar': [1, 2], 'all': [1, 2, 3, 4]}
 
     targets = torch.cat([pred["target"] for pred in forw_preds])
     variant_type = torch.cat([pred["variant_type"] for pred in forw_preds])
+
+    # prediction sign. some predictions should be reversed (ref-alt instead of alt-ref)
+    # because dataset variant logFC is calculated as log(Major / Minor)
     prediction_sign = torch.cat([pred["reverse_prediction"] for pred in forw_preds])
 
     y_preds_forw_ref = torch.cat([pred["ref_predicted"] for pred in forw_preds])
@@ -111,18 +114,27 @@ def get_variant_predictions(forw_preds, revcomp_preds, variant_types = ['emVar',
 
     variant_prediction = (y_preds_alt - y_preds_ref) * prediction_sign
     
+    results = []
     pears = PearsonCorrCoef()
-
-    full_ans = ''
 
     for i in range(len(variant_types)):
 
         mask = torch.isin(variant_type, torch.tensor(MAP_VARIANTS_TYPE[variant_types[i]]))
         pearsonr = pears(variant_prediction.squeeze()[mask], targets.squeeze()[mask])
 
-        full_ans = full_ans + f'{variant_types[i]} (n = {mask.sum().item()}):   {pearsonr:.6f}\n'
-    
-    return full_ans
+        if return_df:
+            results.append({
+                'variant_type': variant_types[i],
+                'n': mask.sum().item(),
+                'pearsonr': pearsonr.item()
+            })
+        
+        else:
+             print(f'{variant_types[i]} (n = {mask.sum().item()}):   {pearsonr:.6f}')
+
+    if return_df:
+        df = pd.DataFrame(results)
+        return df
 
 
 std_err = [cell + "_lfcSE" for cell in args.cell_types_train]
@@ -184,7 +196,7 @@ for run in list(range(args.runs)):
         loss =nn.MSELoss()
 
     elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
-        model = DREAM_RNN(in_channels=len(train_dataset_own[0][0]), seqsize=600, out_channels=len(args.cell_types))
+        model = DREAM_RNN(in_channels=len(train_dataset_own[0][0]), seqsize=600, out_channels=len(args.cell_types_train))
         loss = nn.MSELoss()
 
     seq_model = LitModel_Lee(model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1, use_one_cycle=use_one_cycle)
@@ -209,17 +221,17 @@ for run in list(range(args.runs)):
     best_model_path = checkpoint_callback.best_model_path
     seq_model = LitModel_Lee.load_from_checkpoint(best_model_path,model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr,  print_each=1, use_one_cycle=use_one_cycle)
 
-    predict_forward_dataset = LeeDataset(split = 'test', length = 145, transform=forw_transform, root = args.root)
+    predict_forward_dataset = LeeDataset(split = 'test', length = 150, transform=forw_transform, root = args.root)
     predict_forward_dataloader = DataLoader(dataset=predict_forward_dataset, batch_size=1024, shuffle=False, num_workers=args.num_workers, pin_memory=True,)
 
-    predict_revcomp_dataset = LeeDataset(split = 'test', length = 145, transform=revcomp_transform, root = args.root)
+    predict_revcomp_dataset = LeeDataset(split = 'test', length = 150, transform=revcomp_transform, root = args.root)
     predict_revcomp_dataloader = DataLoader(dataset=predict_forward_dataset, batch_size=1024, shuffle=False, num_workers=args.num_workers, pin_memory=True,)
 
     forw_preds = trainer.predict(seq_model, dataloaders=predict_forward_dataloader)
     revcomp_preds = trainer.predict(seq_model, dataloaders=predict_revcomp_dataloader)
 
-    results = get_variant_predictions(forw_preds, revcomp_preds, ['emVar', 'all_daVar', 'all'])
+    results = Lee_variants_prediction(forw_preds, revcomp_preds)
 
-    with open(f"{args.result_dir}/{args.model}_run{run}.txt", 'w') as f:
-        f.write(results)
-    f.close()
+    output_file = f"{args.result_dir}/{args.model}_run{run}.tsv"
+
+    results.to_csv(output_file, sep="\t", index=False)

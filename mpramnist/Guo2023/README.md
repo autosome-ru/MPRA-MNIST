@@ -274,18 +274,43 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/exampl
     python3 Guo_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types AST --result_dir ./Guo_AST_dreamrnn.tsv
 ```
 
+## AlphaGenome Quality
 
-## Achieved Quality Using LegNet Model in MPRA-MNIST
 
-Pearson correlation, r
+| **cell_type** | **n_all** | **pearsonr_all** | **n_daSNP** | **pearsonr_daSNP** |
+|-----------|-------|--------------|---------|----------------|
+| AST       | 2087  | -0.0270    | 65      | -0.1653      |
+| ES        | 2069  | -0.0211    | 104     | -0.1860      |
+| N-D2      | 2107  | -0.0019    | 84      | 0.02943       |
+| N-D4      | 2111  | -0.0158    | 186     | -0.0670      |
+| N-D10     | 2092  | -0.0295    | 149     | -0.0955      |
+| A-NPC     | 2121  | -0.0175    | 71      | -0.0494      |
+| D283      | 1779  | 0.0432     | 70      | 0.2248       |
+| D341      | 1787  | 0.0093     | 150     | 0.1489       |
+| IMR.diff  | 1783  | 0.0037     | 188     | 0.0744       |
+| IMR.prog  | 1789  | 0.0038     | 269     | 0.1366       |
+| SHSY5Y.diff | 1790 | 0.0093    | 173     | 0.1154       |
+| SHSY5Y.prog | 1785 | 0.0014    | 112     | 0.0780       |
+| HEK293T   | 2149  | -0.0422    | 269     | -0.0972      |
 
-    r = 0.4 for SORT1 (HepG2)
-    
-    r = 0.54 for PKLR (K562)
 
-    r = 0.66 for LDLR (HepG2)
-    
-    r = 0.52 for F9 (HepG2)
+## Achieved Quality Using LegNet Model trained on Gosai SK-N-SH data in MPRA-MNIST
+
+| **cell_type** | **n_all** | **pearsonr_all** | **n_daSNP** | **pearsonr_daSNP** |
+|---------------|-----------|------------------|-------------|--------------------|
+| AST           | 2087      | -0.0459          | 65          | -0.1084            |
+| ES            | 2069      | -0.0134          | 104         | -0.0632            |
+| N-D2          | 2107      | -0.0495          | 84          | -0.1539            |
+| N-D4          | 2111      | -0.0386          | 186         | -0.1316            |
+| N-D10         | 2092      | -0.0652          | 149         | -0.1559            |
+| A-NPC         | 2121      | -0.0297          | 71          | -0.0729            |
+| D283          | 1779      | 0.0842           | 70          | 0.1808             |
+| D341          | 1787      | 0.0384           | 150         | 0.1125             |
+| IMR.diff      | 1783      | 0.0538           | 188         | 0.0718             |
+| IMR.prog      | 1789      | 0.0224           | 269         | 0.1056             |
+| SHSY5Y.diff   | 1790      | 0.0369           | 173         | 0.0320             |
+| SHSY5Y.prog   | 1785      | 0.0244           | 112         | 0.0818             |
+| HEK293T       | 2149      | -0.0460          | 269         | -0.0987            |
 
 ## Citation
 

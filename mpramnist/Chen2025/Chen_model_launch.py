@@ -68,12 +68,12 @@ dataset_args.add_argument("--cell_types_train",
 
 dataset_args.add_argument("--cell_types_variant",
                      nargs='+',            # accepts one or more values
-                     default=['THP1', 'Brain', 'HMC3'],
+                     default=None,
                      help="List of cell types")
 
 dataset_args.add_argument("--states_variant",
                      nargs='+',            # accepts one or more values
-                     default=['all', 'all', 'all'],
+                     default=None,
                      help="List of states for each cell type.")
 
 dataset_args.add_argument("--interval_type",
@@ -123,7 +123,7 @@ def get_variant_predictions(forw_preds, revcomp_preds, cell_types):
     y_preds_ref = torch.mean(torch.stack([y_preds_forw_ref, y_preds_revcomp_ref]), dim=0)
     y_preds_alt = torch.mean(torch.stack([y_preds_forw_alt, y_preds_revcomp_alt]), dim=0)
 
-    variant_prediction = (y_preds_alt - y_preds_ref) * reverse_prediction
+    variant_prediction = (y_preds_alt - y_preds_ref).squeeze() * reverse_prediction.squeeze()
     
     results = []
     pears = PearsonCorrCoef()
@@ -208,7 +208,7 @@ for run in list(range(args.runs)):
         loss =nn.MSELoss()
 
     elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
-        model = DREAM_RNN(in_channels=len(train_dataset_own[0][0]), seqsize=600, out_channels=len(args.cell_types))
+        model = DREAM_RNN(in_channels=len(train_dataset_own[0][0]), seqsize=600, out_channels=len(args.cell_types_train))
         loss = nn.MSELoss()
 
     seq_model = LitModel_Chen(model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1, use_one_cycle=use_one_cycle)
@@ -233,16 +233,16 @@ for run in list(range(args.runs)):
     best_model_path = checkpoint_callback.best_model_path
     seq_model = LitModel_Chen.load_from_checkpoint(best_model_path,model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr,  print_each=1, use_one_cycle=use_one_cycle)
 
-    predict_forward_dataset = ChenMultiDataset(split = 'test', length = 227, cell_types = args.cell_types_variant, states = args.states, interval_type = args.interval_type, transform=forw_transform, root =args.root)
+    predict_forward_dataset = ChenMultiDataset(split = 'test', length = 227, cell_types = args.cell_types_variant, states = args.states_variant, interval_type = args.interval_type, transform=forw_transform, root =args.root)
     predict_forward_dataloader = DataLoader(dataset=predict_forward_dataset, batch_size=1024, shuffle=False, num_workers=args.num_workers, pin_memory=True,)
 
-    predict_revcomp_dataset = ChenMultiDataset(split = 'test', length = 227, cell_types = args.cell_types_variant, states = args.states, interval_type = args.interval_type, transform=revcomp_transform, root =args.root)
+    predict_revcomp_dataset = ChenMultiDataset(split = 'test', length = 227, cell_types = args.cell_types_variant, states = args.states_variant, interval_type = args.interval_type, transform=revcomp_transform, root =args.root)
     predict_revcomp_dataloader = DataLoader(dataset=predict_forward_dataset, batch_size=1024, shuffle=False, num_workers=args.num_workers, pin_memory=True,)
 
     forw_preds = trainer.predict(seq_model, dataloaders=predict_forward_dataloader)
     revcomp_preds = trainer.predict(seq_model, dataloaders=predict_revcomp_dataloader)
 
-    results = get_variant_predictions(forw_preds, revcomp_preds, args.cell_types_variant, ['THP1_aggregated', 'THP1_Naive', 'THP1_IFNB', 'THP1_IFNG', 'THP1_LPSIFNG'], ['HMC3_aggregated','HMC3_Naive', 'HMC3_IFNB', 'HMC3_IFNG', 'HMC3_LPSIFNG'], ['Brain_aggregated','Brain_Cortex', 'Brain_Hippocampus', 'Brain_Striatum'])
+    results = get_variant_predictions(forw_preds, revcomp_preds, ['THP1_aggregated', 'THP1_Naive', 'THP1_IFNB', 'THP1_IFNG', 'THP1_LPSIFNG', 'HMC3_aggregated','HMC3_Naive', 'HMC3_IFNB', 'HMC3_IFNG', 'HMC3_LPSIFNG', 'Brain_aggregated','Brain_Cortex', 'Brain_Hippocampus', 'Brain_Striatum'])
 
     output_file = f"{args.result_dir}/{args.model}_run{run}.tsv"
 

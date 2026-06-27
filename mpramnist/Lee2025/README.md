@@ -184,18 +184,22 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/exampl
 ```
 
 
-## Achieved Quality Using LegNet Model in MPRA-MNIST
+## AlphaGenome Quality
 
-Pearson correlation, r
+| **variant_type** | **n**     | **pearsonr** |
+|--------------|-------|----------|
+| emVar        | 683   | 0.01301 |
+| daVar        | 4472  | 0.00035 |
+| all          | 13261 | 0.00185 |
 
-    r = 0.4 for SORT1 (HepG2)
-    
-    r = 0.54 for PKLR (K562)
 
-    r = 0.66 for LDLR (HepG2)
-    
-    r = 0.52 for F9 (HepG2)
+## Achieved Quality Using LegNet Model trained on Gosai data in MPRA-MNIST
 
+| **variant_type** | **n**     | **pearsonr**            |
+|--------------|-------|-------------------------|
+| emVar        | 683   | -0.0253   |
+| daVar        | 4472  | 0.0045    |
+| all          | 13261 | 0.0047    |
 
 ## Citation
 

@@ -103,7 +103,7 @@ class GuoMultiDataset(MpraDataset):
         self.prefix = self.FLAG + "_"  # Prefix for file names
         
         # Validate promoter-enhancer input
-        if not ((isinstance(cell_types, str) and cell_types in self.CELL_TYPES) 
+        if cell_types and not ((isinstance(cell_types, str) and cell_types in self.CELL_TYPES) 
                 or
                 (isinstance(cell_types, list) and all(ct in self.CELL_TYPES for ct in cell_types))):
             raise ValueError("Invalid cell type")
@@ -186,8 +186,8 @@ class GuoMultiDataset(MpraDataset):
         )
 
         # Identifier for split information
-        target_column = [f'logFC_{ct}' for ct in cell_types]
-        fdr_column = [f'fdr_{ct}' for ct in cell_types]
+        target_column = [f'logFC_{ct}' for ct in cell_types] if cell_types else [col for col in self.ds.columns if 'logFC' in col]
+        fdr_column = [f'fdr_{ct}' for ct in cell_types] if cell_types else [col for col in self.ds.columns if 'fdr' in col]
         targets = self.ds[target_column].to_numpy()
         fdrs = self.ds[fdr_column].to_numpy()
         seq_alt = self.ds.seq_alt.to_numpy()

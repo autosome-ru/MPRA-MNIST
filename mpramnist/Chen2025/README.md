@@ -293,30 +293,46 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/exampl
     python3 Chen_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types Brain --states aggregated --result_dir ./Guo_AST_dreamrnn.tsv
 ```
 
-## Original Benchmark Quality
-
-Pearson correlation, r 
-
-    r = 0.49 for SORT1 (HepG2)
-    
-    r = 0.65 for PKLR (K562)
-
-    r = 0.66 for LDLR (HepG2)
-    
-    r = 0.51 for F9 (HepG2)
+## AlphaGenome Quality
 
 
-## Achieved Quality Using LegNet Model in MPRA-MNIST
+| **cell_type**          | **n_all** | **pearsonr_all** | **n_daSNP** | **pearsonr_daSNP** |
+|--------------------|-------|--------------|---------|----------------|
+| THP1_aggregated    | 833   | 0.0116       | 343     | 0.0374         |
+| THP1_Naive         | 833   | 0.0062       | 223     | 0.0078         |
+| THP1_IFNB          | 833   | 0.0377       | 186     | 0.0273         |
+| THP1_IFNG          | 833   | -0.0552      | 264     | -0.1031        |
+| THP1_LPSIFNG       | 833   | 0.0261       | 190     | 0.0449         |
+| HMC3_aggregated    | 833   | -0.0255      | 112     | 0.0159         |
+| HMC3_Naive         | 833   | 0.0102       | 119     | 0.0081         |
+| HMC3_IFNB          | 833   | 0.0164       | 57      | 0.1748         |
+| HMC3_IFNG          | 833   | 0.0269       | 28      | -0.1696        |
+| HMC3_LPSIFNG       | 833   | -0.0107      | 32      | -0.0441        |
+| Brain_aggregated   | 833   | 0.0446       | 31      | 0.1407         |
+| Brain_Cortex       | 833   | -0.0198      | 29      | -0.1421        |
+| Brain_Hippocampus  | 833   | 0.0264       | 13      | -0.1662        |
+| Brain_Striatum     | 833   | 0.0463       | 4       | 0.3375         |
 
-Pearson correlation, r
 
-    r = 0.4 for SORT1 (HepG2)
-    
-    r = 0.54 for PKLR (K562)
+## Achieved Quality Using LegNet Model trained on Gosai SK-N-SH data in MPRA-MNIST
 
-    r = 0.66 for LDLR (HepG2)
-    
-    r = 0.52 for F9 (HepG2)
+
+| **cell_type**          | **pearsonr_all** | **n_daSNP** | **pearsonr_daSNP** |
+|--------------------|--------------|---------|----------------|
+| THP1_aggregated    | 0.0331       | 343     | 0.0442         |
+| THP1_Naive         | 0.0111       | 223     | 0.0165         |
+| THP1_IFNB          | 0.0417       | 186     | 0.0444         |
+| THP1_IFNG          | 0.0167       | 264     | -0.0120        |
+| THP1_LPSIFNG       | 0.0232       | 190     | 0.0628         |
+| HMC3_aggregated    | 0.0177       | 112     | 0.0840         |
+| HMC3_Naive         | 0.0285       | 119     | 0.1466         |
+| HMC3_IFNB          | 0.0632       | 57      | 0.1881         |
+| HMC3_IFNG          | -0.0007      | 28      | 0.0666         |
+| HMC3_LPSIFNG       | 0.0154       | 32      | -0.1438        |
+| Brain_aggregated   | 0.0198       | 31      | -0.0008        |
+| Brain_Cortex       | 0.0098       | 29      | 0.0230         |
+| Brain_Hippocampus  | 0.0242       | 13      | 0.3521         |
+| Brain_Striatum     | 0.0441       | 4       | 0.3919         |
 
 
 ## Citation
