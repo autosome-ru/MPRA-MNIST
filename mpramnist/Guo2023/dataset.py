@@ -154,7 +154,7 @@ class GuoMultiDataset(MpraDataset):
         except Exception as e:
             raise IOError(f"Error loading FASTA file {fasta_file}: {str(e)}") from e
         
-        self.ds.position = self.ds.position - 1                     # !!!! beacuse there is a shift and in origin oligos SNP is NOT in the center
+        self.ds.position = self.ds.position - 1
 
         mask = self.ds.alt.str.len() == 1
         self.ds = self.ds[mask]

@@ -2,7 +2,7 @@
 
 ## Main Information
 
-The Guo dataset is based on results from MPRA experiments from [Guo et al. 2023](https://www.nature.com/articles/s41588-023-01533-5). The study characterized **2,221 non-coding single-nucleotide variants (SNVs)** connected to risk for ten neuropsychiatric disorders across multiple neural cell types, identifying 892 differentially-active SNVs (daSNVs) with significant allelic activity differences.
+The Guo dataset is based on results from lentiMPRA experiments from [Guo et al. 2023](https://www.nature.com/articles/s41588-023-01533-5). The study characterized **2,221 non-coding single-nucleotide variants (SNVs)** connected to risk for ten neuropsychiatric disorders across multiple neural cell types, identifying 892 differentially-active SNVs (daSNVs) with significant allelic activity differences.
 
 These experimentally characterized sequences are proposed as a benchmark dataset for validating machine learning model quality on regulatory variant effect prediction. Specifically, models can be trained on independent data (e.g., other MPRA datasets) and their predictive power can be evaluated on the Guo MPRA data.
 
@@ -13,9 +13,11 @@ These experimentally characterized sequences are proposed as a benchmark dataset
 
 The study tested **2,221 non-coding variants** associated with ten neuropsychiatric disorders, including:
 
+*   **MPRA experiment type:** lentivirus-based MPRA (lentiMPRA)
 *   **Variant selection:** Variant were chosen from 10 neuropsychiatric GWAS datasets
 *   **Negative controls:** 22 blacklisted regions by ENCODE hg19
 *   **Interval length:** 145 bp fragments centered on each variant for both reverence and alternate alleles
+*   **Variant logFC activity:** estimated with MPRAnalyze
 *   **daSNP:** SNVs with allele specific activity were defined as those achieve a | log2(fold-change)| > 0.05 and an FDR-corrected p-value < 0.05
 
 
@@ -70,7 +72,7 @@ chr11_47365014	chr11  47365014	  C	  T	    2.91	0.000488	0.0224593	12.1591861	GC
 
 
 **Column descriptions:**
-*   `logFC`: Variant activity score  *log₂(alt/ref)*
+*   `logFC`: Variant activity score estimated with MPRAnalyze
 *   `pval`: MPRA p-value
 *   `fdr`: MPRA p-value after FDR correction
 *   `orig_seq`: original sequence from the assay
@@ -91,7 +93,7 @@ chr10_104426177	chr10	104426177	G	A	ATTGTGGTTC	-0.47585	0.266	0.671	1.22430 ... 
 ```
 
 **Column descriptions:**
-*   `logFC_CELL_TYPE`: Variant activity score  *log₂(alt/ref)* measured in `CELL_TYPE`
+*   `logFC_CELL_TYPE`: Variant activity score, measured in `CELLTYPE` and estimated with MPRAnalyze
 *   `pval_CELL_TYPE`: MPRA p-value measured in `CELL_TYPE`
 *   `fdr_CELL_TYPE`: MPRA p-value after FDR correction measured in `CELL_TYPE`
 *   `orig_seq`: original sequence from the assay
@@ -191,7 +193,7 @@ Root directory where data is stored. If None, uses default data directory.
 
 1) The data is intended exclusively for validation of machine learning models.
 
-2) The dataset contains information about nucleotide positions in the hg19 genome, including reference and alternative nucleotide variants. For your specific task, use the `length` parameter (default: 145) to extract nucleotide sequences with specified length and the variant nucleotide at the center.
+2) The dataset contains information about nucleotide positions in the hg19 genome, including reference and alternative nucleotide variants. For your specific task, use the `length` parameter (default: 145) to extract nucleotide sequences with specified length and the variant nucleotide at the center. However, please note that the effects are measured in an MPRA assay using sequences of length 145. Thus, changing this parameter will likely result in a biologically irrelevant prior for the model.
 
 3) When using the dataset, the hg19 genome is automatically loaded if not previously available, and nucleotide sequences of the specified length are extracted with the variant nucleotide positioned at the center.
 

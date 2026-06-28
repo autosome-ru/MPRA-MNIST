@@ -948,4 +948,3 @@ class ChenSingleDataset(MpraDataset):
             raise ValueError(
                 f"Error processing {chromosome}:{snp_pos}-{ref}>{alt}: {str(e)}"
             ) from e
-

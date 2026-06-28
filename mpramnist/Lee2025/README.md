@@ -2,7 +2,7 @@
 
 ## Main Information
 
-The Lee dataset is based on results from massively parallel reporter assay (MPRA) experiments from [Lee et al. 2023](https://doi.org/10.1016/j.cell.2024.12.022). The study characterized **13,261 non-coding single-nucleotide variants (SNVs)** connected to risk for eight psychiatric disorders, conducted in human neural progenitor cells (HNPs). The experiment identified **1,461 expression-modulating variants (emVars)** with significant allelic activity differences.
+The Lee dataset is based on results from **episomal** massively parallel reporter assay (MPRA) experiments from [Lee et al. 2023](https://doi.org/10.1016/j.cell.2024.12.022). The study characterized **13,261 non-coding single-nucleotide variants (SNVs)** connected to risk for eight psychiatric disorders, conducted in human neural progenitor cells (HNPs). The experiment identified **1,461 expression-modulating variants (emVars)** with significant allelic activity differences.
 
 These experimentally characterized sequences are proposed as a benchmark dataset for validating machine learning model quality on regulatory variant effect prediction. Specifically, models can be trained on independent data (e.g., other MPRA datasets) and their predictive power can be evaluated on the Lee MPRA data.
 
@@ -11,11 +11,13 @@ These experimentally characterized sequences are proposed as a benchmark dataset
 
 The study tested **13,261 non-coding variants** associated with eight psychiatric disorders, including:
 
+*   **MPRA experiment type:** episomal MPRA
 *   **Cell type:** Human neural progenitor cells (HNPs) derived from fetal brain tissue
 *   **Variant selection:** Variants were chosen from 8 psychiatric GWAS datasets
 *   **Negative controls:** scrambled DNA sequences with matching GC content to the MPRA library
 *   **Positive controls:** sections of the cytomegalovirus (CMV) and elongation factor 1 alpha (EF1a) promoters a
 *   **Interval length:** 150 bp fragments centered on each variant for both risk and protective alleles
+*   **Variant logFC activity:** estimated with mpra (version 1.24.0) Bioconductor package
 *   **emVar:** 683 variants showing significant allelic regulatory activity (FDR < 0.05) located in MPRA‑active elements
 
 
@@ -54,16 +56,16 @@ chr4	42178259	42176242	rs10005662	C	T	-1	-0.1746818	0.018632	MPRA-Allelic	-0.887
 **Column descriptions:**
 *   `reverse_prediction`: If the prediction sign should be inverted (ref allele is non-effect for GWAS)
 *   `Variant_Class`: Different classes of variants
-*   `MPRA_logFC`: Variant activity score  *log₂(alt/ref)*
+*   `MPRA_logFC`: Variant activity score, estimated mpra (version 1.24.0) Bioconductor package
 *   `MPRA_FDR`: MPRA p-value after FDR correction
 *   `MPRA_AveExpr`: MPRA average expression value
-*   `MPRA_t`: MPRA t value
-*   `MPRA_P`: MPRA P value
-*   `MPRA_B`: MPRA B value
-*   `GWAS_P`: MPRA p-value, mean across significant tissues
-*   `GWAS_OR`: MPRA p-value, mean across significant tissues
-*   `GWAS_SE`: MPRA p-value, mean across significant tissues
-*   `GWAS_frq`: Frequency of the Major allele in GWAS
+*   `MPRA_t`: MPRA t-value (moderated t-statistic)
+*   `MPRA_P`: MPRA p-value
+*   `MPRA_B`: MPRA B-value (log-odds of differential expression or activity)
+*   `GWAS_P`: P-value of the variant in GWAS
+*   `GWAS_OR`: Odds ratio of the variant in GWAS
+*   `GWAS_SE`: Standard error of the variant in GWAS
+*   `GWAS_frq`: Frequency of the effect allele in GWAS: reference allele if `reverse_prediction = 1`, alternate allele otherwise
 
 
 
@@ -110,7 +112,7 @@ Root directory where data is stored. If None, uses default data directory.
 
 1) The data is intended exclusively for validation of machine learning models.
 
-2) The dataset contains information about nucleotide positions in the hg38 genome, including reference and alternative nucleotide variants. For your specific task, use the `length` parameter (default: 150) to extract nucleotide sequences with specified length and the variant nucleotide at the center.
+2) The dataset contains information about nucleotide positions in the hg38 genome, including reference and alternative nucleotide variants. For your specific task, use the `length` parameter (default: 150) to extract nucleotide sequences with specified length and the variant nucleotide at the center. However, please note that the effects are measured in an MPRA assay using sequences of length 150. Thus, changing this parameter will likely result in a biologically irrelevant prior for the model.
 
 3) When using the dataset, the hg38 genome is automatically loaded if not previously available, and nucleotide sequences of the specified length are extracted with the variant nucleotide positioned at the center.
 
