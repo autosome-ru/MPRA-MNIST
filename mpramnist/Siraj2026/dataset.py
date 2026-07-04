@@ -45,8 +45,15 @@ class SirajMPRADataset(MpraDataset):
 
     FLAG = "Siraj"
 
-    # Mapping of elements to their corresponding cell types
+    # Possible cell types
     CELL_TYPE: list[str] = ["K562", "HEPG2", "A549", "SKNSH", "HCT116"]
+
+    CONSTANT_LEFT_FLANK = "ACTGGCCGCTTGACG"  # required for each sequence
+    CONSTANT_RIGHT_FLANK = "CACTGCGGCTCCTGC"  # required for each sequence
+    LEFT_FLANK = "GGCCCGCTCTAGACCTGCAGG"  # from human_legnet
+    RIGHT_FLANK = (
+        "CACTAGAGGGTATATAATGGAAGCTCGACTTCCAGCTTGGCAATCCGGTACTGT"  # from human_legnet
+    )
 
     def __init__(
         self,
@@ -419,10 +426,16 @@ class SirajSatMutDataset(MpraDataset):
 
     FLAG = "Siraj"
 
-    # Mapping of elements to their corresponding cell types
+    # Possible cell types
     CELL_TYPE: list[str] = ["K562", "HEPG2"]
-
     MUT_NUM: list[int] = [1, 2]
+
+    CONSTANT_LEFT_FLANK = "ACTGGCCGCTTGACG"  # required for each sequence
+    CONSTANT_RIGHT_FLANK = "CACTGCGGCTCCTGC"  # required for each sequence
+    LEFT_FLANK = "GGCCCGCTCTAGACCTGCAGG"  # from human_legnet
+    RIGHT_FLANK = (
+        "CACTAGAGGGTATATAATGGAAGCTCGACTTCCAGCTTGGCAATCCGGTACTGT"  # from human_legnet
+    )
 
     def __init__(
         self,
