@@ -408,18 +408,19 @@ class SirajSatMutDataset(MpraDataset):
     Constants:
         FLAG (str): Dataset identifier flag: 'Siraj'
         CELL_TYPE (list): Available cell types
-        MUT_NUM (list): Possible mutation numbers
+        MUT_NUM (list): Available baseline mutation number
 
     Examples:
         >>> # Load data for specific cell type
-        >>> dataset = SirajSatMutDataset(cell_type='K562')
+        >>> dataset = SirajSatMutDataset(cell_type='K562', mut_num=1)
         >>>
         >>> # Load data with custom sequence length
-        >>> dataset = SirajSatMutDataset(cell_type='HEPG2', length=300)
+        >>> dataset = SirajSatMutDataset(cell_type='HEPG2', mut_num=1, length=300)
         >>>
         >>> # Load data filtered by genomic regions
         >>> dataset = SirajSatMutDataset(
         ...     cell_type='K562',
+        ...     mut_num=1,
         ...     genomic_regions='path/to/regions.bed'
         ... )
     """
