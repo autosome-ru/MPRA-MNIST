@@ -27,7 +27,7 @@ class SirajMPRADataset(MpraDataset):
 
     Constants:
         FLAG (str): Dataset identifier flag: 'Siraj'
-        CELL_TYPE (str): Possible cell types
+        CELL_TYPE (str): Available cell types
 
     Examples:
         >>> # Load data for specific cell type
@@ -45,7 +45,7 @@ class SirajMPRADataset(MpraDataset):
 
     FLAG = "Siraj"
 
-    # Possible cell types
+    # Available cell types
     CELL_TYPE: list[str] = ["K562", "HEPG2", "A549", "SKNSH", "HCT116"]
 
     CONSTANT_LEFT_FLANK = "ACTGGCCGCTTGACG"  # required for each sequence
@@ -407,7 +407,7 @@ class SirajSatMutDataset(MpraDataset):
 
     Constants:
         FLAG (str): Dataset identifier flag: 'Siraj'
-        CELL_TYPE (list): Possible cell types
+        CELL_TYPE (list): Available cell types
         MUT_NUM (list): Possible mutation numbers
 
     Examples:
@@ -426,7 +426,7 @@ class SirajSatMutDataset(MpraDataset):
 
     FLAG = "Siraj"
 
-    # Possible cell types
+    # Available cell types
     CELL_TYPE: list[str] = ["K562", "HEPG2"]
     MUT_NUM: list[int] = [1, 2]
 
