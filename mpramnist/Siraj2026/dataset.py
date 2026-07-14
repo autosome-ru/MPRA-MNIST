@@ -78,7 +78,7 @@ class SirajMPRADataset(MpraDataset):
         ----------
         cell_type : str
             Cell type to filter by.
-            Must be a single string.
+            Must be one of: "K562", "HEPG2", "A549", "SKNSH", "HCT116".
         split : str, optional
             Specifies how to split the data. Currently only "test" is supported.
             Default is "test".
@@ -89,23 +89,23 @@ class SirajMPRADataset(MpraDataset):
             Genomic regions to include/exclude. Can be:
             - Path to BED file
             - List of dictionaries with 'chrom', 'start', 'end' keys
-        exclude_regions : bool
+        exclude_regions : bool, optional
             If True, exclude the specified regions instead of including them.
-        filter_not_active : bool
+        filter_not_active : bool, optional
             If True, exclude sequences not active in all cell lines instead of including them.
-        filter_not_emVar : bool
+        filter_not_emVar : bool, optional
             If True, exclude variants not expression-modulating in all cell lines instead of including them.
-        filter_not_active_in_cellline : bool
+        filter_not_active_in_cellline : bool, optional
             If True, exclude sequences not active in target cell line instead of including them.
-        filter_not_emVar_in_cellline : bool
+        filter_not_emVar_in_cellline : bool, optional
             If True, exclude variants not expression-modulating in target cell line instead of including them.
-        filter_mnp : bool
+        filter_mnp : bool, optional
             If True, exclude multiple nucleotide polymorphisms instead of including them.
-        transform : callable, optional
+        transform : callable, optional, optional
             Transformation applied to each sequence object.
-        target_transform : callable, optional
+        target_transform : callable, optional, optional
             Transformation applied to the target data (expression values).
-        root : str, optional
+        root : str, optional, optional
             Root directory where data is stored. If None, uses default data directory.
         """
         # Initialize parent class
@@ -457,23 +457,22 @@ class SirajSatMutDataset(MpraDataset):
         Attributes
         ----------
         cell_type : str
-            Cell type to filter by.
-            Must be a single string.
+            Cell type to filter by. Must be one of: "K562", "HEPG2".
         mut_num : int
-            Number of baseline mutations (1 or 2).
+            Number of baseline mutations. Must be 1 or 2.
         split : str, optional
             Specifies how to split the data. Currently only "test" is supported.
             Default is "test".
         length : int, optional
             Length of the sequence for the differential expression experiment.
             Must be positive integer. Default is 200.
-        log2Skew_pval: float
+        log2Skew_pval: float, optional
             Threshold p-value for log2Skew.
         genomic_regions : str | List[Dict], optional
             Genomic regions to include/exclude. Can be:
             - Path to BED file
             - List of dictionaries with 'chrom', 'start', 'end' keys
-        exclude_regions : bool
+        exclude_regions : bool, optional
             If True, exclude the specified regions instead of including them.
         transform : callable, optional
             Transformation applied to each sequence object.
