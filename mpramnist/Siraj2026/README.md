@@ -164,10 +164,10 @@ Root directory where data is stored. If None, uses default data directory.
 ### 1) Import Important Packages
 
 ```python
-    import mpramnist
-    from mpramnist.Siraj2026.dataset import SirajMPRADataset, SirajSatMutDataset
+import mpramnist
+from mpramnist.Siraj2026.dataset import SirajMPRADataset, SirajSatMutDataset
 
-    import torch.utils.data as data
+import torch.utils.data as data
 ```
 
 ### 2) Dataset Creation
@@ -216,27 +216,27 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/mpramn
 ### SirajMPRA
 
 ```bash
-    #MpraLegNet
-    python3 SirajMPRA_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_legnet.tsv
-    #Malinois
-    python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_malinois.tsv
-    #MPRAnn
-    python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_mprann.tsv
-    #PARM
-    python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_parm.tsv
+#MpraLegNet
+python3 SirajMPRA_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_legnet.tsv
+#Malinois
+python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_malinois.tsv
+#MPRAnn
+python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_mprann.tsv
+#PARM
+python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --result_dir ./sirajmpra_hepg2_parm.tsv
 ```
 
 ### SirajSatMut
 
 ```bash
-    #MpraLegNet
-    python3 SirajSatMut_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_legnet.tsv
-    #Malinois
-    python3 SirajSatMut_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_malinois.tsv
-    #MPRAnn
-    python3 SirajSatMut_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_mprann.tsv
-    #PARM
-    python3 SirajSatMut_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_parm.tsv
+#MpraLegNet
+python3 SirajSatMut_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_legnet.tsv
+#Malinois
+python3 SirajSatMut_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_malinois.tsv
+#MPRAnn
+python3 SirajSatMut_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_mprann.tsv
+#PARM
+python3 SirajSatMut_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_type HepG2 --mut_num 1 --result_dir ./sirajsatmut_hepg2_parm.tsv
 ```
 
 ## Citation
@@ -248,12 +248,12 @@ When using this dataset, please cite the original publication:
 Siraj, L., Castro, R.I., Dewey, H.B. et al. Functional dissection of complex trait variants at single-nucleotide resolution. Nature (2026). https://doi.org/10.1038/s41586-026-10121-6
 
 ```bibtex
-    @article{siraj2026functional,
-        title={Functional dissection of complex trait variants at single-nucleotide resolution},
-        author={Siraj, Layla and Castro, Rodrigo I and Dewey, Hannah B and Kales, Susan and Butts, John C and Nguyen, Thanh Thanh L and Kanai, Masahiro and Berenzy, Daniel and Mouri, Kousuke and Wang, Qingbo S and others},
-        journal={Nature},
-        pages={1--11},
-        year={2026},
-        publisher={Nature Publishing Group UK London}
-    }
+@article{siraj2026functional,
+    title={Functional dissection of complex trait variants at single-nucleotide resolution},
+    author={Siraj, Layla and Castro, Rodrigo I and Dewey, Hannah B and Kales, Susan and Butts, John C and Nguyen, Thanh Thanh L and Kanai, Masahiro and Berenzy, Daniel and Mouri, Kousuke and Wang, Qingbo S and others},
+    journal={Nature},
+    pages={1--11},
+    year={2026},
+    publisher={Nature Publishing Group UK London}
+}
 ```
