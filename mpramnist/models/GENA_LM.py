@@ -5,6 +5,8 @@ from typing import List, Dict
 import torch.nn.functional as F
 
 from transformers import AutoTokenizer, BertModel
+from transformers.utils import logging as hf_logging
+hf_logging.set_verbosity_error()
 
 def initialize_head(module: nn.Module):
     """
