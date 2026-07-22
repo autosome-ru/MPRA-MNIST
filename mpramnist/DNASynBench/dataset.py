@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 import os
 from mpramnist.mpradataset import MpraDataset
+from DNA_model import MarkovDNA
 
 
 class SimpleMotifDataset(MpraDataset):
@@ -55,10 +56,12 @@ class SimpleMotifDataset(MpraDataset):
         n_neg = n_seqs - n_pos
         test_size = (1 - train_size) / 2
         seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
+        neg_model = MarkovDNA.load("cds_model.pkl")
         with tqdm(total=n_seqs) as pbar:
             for i in range(n_pos):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert = randint(0, length - len(motif))
                     seq = seq[:insert] + motif + seq[insert+len(motif):]
                     if seq.count(motif) == 1:
@@ -67,7 +70,7 @@ class SimpleMotifDataset(MpraDataset):
                         break
             for i in range(n_neg):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = neg_model.generate(length)
                     if motif not in seq:
                         seqs.append((seq, 0))
                         pbar.update(1)
@@ -135,11 +138,12 @@ class LinCoopDataset(MpraDataset):
         seed(random_state)
         test_size = (1 - train_size) / 2
         seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
         with tqdm(total=n_seqs) as pbar:
             for i in range(n_seqs):
                 while True:
                     n_motifs = randint(min_num, max_num)
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert = -len(motif)
                     if n_motifs != 0:
                         section = (length - len(motif)) // n_motifs
@@ -203,11 +207,12 @@ class NonlinCoopDataset(MpraDataset):
         seed(random_state)
         test_size = (1 - train_size) / 2
         seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
         with tqdm(total=n_seqs) as pbar:
             for i in range(n_seqs):
                 while True:
                     n_motifs = randint(min_num, max_num)
-                    seq = generation(length, gc_content, random_state)
+                    seq = pos_model.generate(length)
                     insert = -len(motif)
                     if n_motifs != 0:
                         section = (length - len(motif)) // n_motifs
@@ -278,10 +283,12 @@ class AlienDataset(MpraDataset):
         max_len = max(len(motif), len(alien))
         test_size = (1 - train_size) / 2
         seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
+        neg_model = MarkovDNA.load("cds_model.pkl")
         with tqdm(total=n_seqs) as pbar:
             for i in range(n_pos):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert = randint(0, length - len(motif))
                     seq = seq[:insert] + motif + seq[insert+len(motif):]
                     if seq.count(motif) == 1:
@@ -290,7 +297,7 @@ class AlienDataset(MpraDataset):
                         break
             for i in range(n_al):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert = randint(0, length - len(alien))
                     seq = seq[:insert] + alien + seq[insert+len(alien):]
                     if seq.count(motif) == 0:
@@ -299,7 +306,7 @@ class AlienDataset(MpraDataset):
                         break
             for i in range(n_mix):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert_1 = randint(0, length//2 - max_len)
                     insert_2 = randint(length//2, length - max_len)
                     inserts = [insert_1, insert_2]
@@ -312,7 +319,7 @@ class AlienDataset(MpraDataset):
                         break
             for i in range(n_neg):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = neg_model.generate(length)
                     if motif not in seq and alien not in seq:
                         seqs.append((seq, 0))
                         pbar.update(1)
@@ -334,7 +341,6 @@ class AlienDataset(MpraDataset):
         new_dataset.ds = {"targets": targets, "seq": seq}
         new_dataset.name_for_split_info = new_dataset.prefix
         return new_dataset
-
 
 class CombinationDataset(MpraDataset):
     """
@@ -377,10 +383,12 @@ class CombinationDataset(MpraDataset):
         max_len = max(len(motif), len(alien))
         test_size = (1 - train_size) / 2
         seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
+        neg_model = MarkovDNA.load("cds_model.pkl")
         with tqdm(total=n_seqs) as pbar:
             for i in range(n_pos):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert = randint(0, length - len(motif))
                     seq = seq[:insert] + motif + seq[insert+len(motif):]
                     if seq.count(alien) == 0:
@@ -389,7 +397,7 @@ class CombinationDataset(MpraDataset):
                         break
             for i in range(n_al):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert = randint(0, length - len(alien))
                     seq = seq[:insert] + alien + seq[insert+len(alien):]
                     if seq.count(motif) == 0:
@@ -398,7 +406,7 @@ class CombinationDataset(MpraDataset):
                         break
             for i in range(n_mix):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
                     insert_1 = randint(0, length//2 - max_len)
                     insert_2 = randint(length//2, length - max_len)
                     inserts = [insert_1, insert_2]
@@ -411,7 +419,7 @@ class CombinationDataset(MpraDataset):
                         break
             for i in range(n_neg):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = neg_model.generate(length)
                     if motif not in seq and alien not in seq:
                         seqs.append((seq, 0))
                         pbar.update(1)
@@ -474,11 +482,13 @@ class DistanceDataset(MpraDataset):
         n_neg = n_seqs - n_near - n_far
         test_size = (1 - train_size) / 2
         seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
+        neg_model = MarkovDNA.load("cds_model.pkl")
         with tqdm(total=n_seqs) as pbar:
             for i in range(n_near):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
-                    dist = generation(randint(0, act_dist), gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
+                    dist = pos_model.generate(randint(0, act_dist))
                     insert = randint(0, length - len(motif) - len(alien) - len(dist))
                     seq = seq[:insert] + motif + dist + alien + seq[insert+len(motif)+len(alien)+len(dist):]
                     if len(dist) <= act_dist:
@@ -487,8 +497,8 @@ class DistanceDataset(MpraDataset):
                         break
             for i in range(n_far):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
-                    dist = generation(randint(act_dist+1, act_dist*3), gc_content, random_state=random_state)
+                    seq = pos_model.generate(length)
+                    dist = pos_model.generate(randint(act_dist+1, act_dist*3))
                     insert = randint(0, length - len(motif) - len(alien) - len(dist))
                     seq = seq[:insert] + motif + dist + alien + seq[insert+len(motif)+len(alien)+len(dist):]
                     if len(dist) >= act_dist:
@@ -497,7 +507,7 @@ class DistanceDataset(MpraDataset):
                         break
             for i in range(n_neg):
                 while True:
-                    seq = generation(length, gc_content, random_state=random_state)
+                    seq = neg_model.generate(length)
                     if motif not in seq and alien not in seq:
                         seqs.append((seq, 0))
                         pbar.update(1)
@@ -519,14 +529,124 @@ class DistanceDataset(MpraDataset):
         new_dataset.ds = {"targets": targets, "seq": seq}
         new_dataset.name_for_split_info = new_dataset.prefix
         return new_dataset
-        
 
-def generation(length, gc_content, random_state):
+class OrderedDataset(MpraDataset):
+    """
+    Binary classification task that implies that the activity depends on order of target and alien motifs.
+    """
+    FLAG = "DNASynBench"
+
+    def __init__(
+        self,
+        split=None,
+        transform=None,
+        target_transform=None
+        ):
+        
+        super().__init__(split)
+
+        self.transform = transform
+        self.target_transform = target_transform
+        self.prefix = self.FLAG + "_"
+        self.ds = {"targets": [], "seq": []}
+        self.name_for_split_info = self.prefix
+        self.n_classes = 2
+        
+    def generate(self,
+        motif: str,
+        alien: str,
+        length=200,
+        n_seqs=10000,
+        ratio=0.8,
+        rat_al=0.8,
+        train_size=0.7,
+        random_state=42):
+        
+        seed(random_state)
+        n_mix = int(n_seqs * ratio * rat_al)
+        n_pos = int(n_seqs * ratio) - n_mix
+        n_al = int(n_seqs * rat_al) - n_mix
+        n_neg = n_seqs - n_pos - n_mix - n_al
+        n_right = n_mix // 2
+        n_back = n_mix - n_right
+        test_size = (1 - train_size) / 2
+        seqs = []
+        pos_model = MarkovDNA.load("promoter_model.pkl")
+        neg_model = MarkovDNA.load("cds_model.pkl")
+        with tqdm(total=n_seqs) as pbar:
+            for i in range(n_pos):
+                while True:
+                    seq = pos_model.generate(length)
+                    insert = randint(0, length - len(motif))
+                    seq = seq[:insert] + motif + seq[insert+len(motif):]
+                    if seq.count(alien) == 0:
+                        seqs.append((seq, 0))
+                        pbar.update(1)
+                        break
+            for i in range(n_al):
+                while True:
+                    seq = pos_model.generate(length)
+                    insert = randint(0, length - len(alien))
+                    seq = seq[:insert] + alien + seq[insert+len(alien):]
+                    if seq.count(motif) == 0:
+                        seqs.append((seq, 0))
+                        pbar.update(1)
+                        break
+            for i in range(n_right):
+                while True:
+                    seq = pos_model.generate(length)
+                    insert_1 = randint(0, length//2 - len(motif))
+                    insert_2 = randint(length//2, length - len(alien))
+                    seq = seq[:insert_1] + motif + seq[insert_1+len(motif):]
+                    seq = seq[:insert_2] + alien + seq[insert_2+len(alien):]
+                    if seq.count(motif) == 1 and seq.count(alien) == 1:
+                        seqs.append((seq, 1))
+                        pbar.update(1)
+                        break
+            for i in range(n_back):
+                while True:
+                    seq = pos_model.generate(length)
+                    insert_1 = randint(0, length//2 - len(alien))
+                    insert_2 = randint(length//2, length - len(motif))
+                    seq = seq[:insert_1] + alien + seq[insert_1+len(alien):]
+                    seq = seq[:insert_2] + motif + seq[insert_2+len(motif):]
+                    if seq.count(motif) == 1 and seq.count(alien) == 1:
+                        seqs.append((seq, 0))
+                        pbar.update(1)
+                        break
+            for i in range(n_neg):
+                while True:
+                    seq = neg_model.generate(length)
+                    if motif not in seq and alien not in seq:
+                        seqs.append((seq, 0))
+                        pbar.update(1)
+                        break
+        shuffle(seqs)
+        df = pd.DataFrame(seqs, columns=['sequence', 'target'])
+        group = ['train'] * int(n_seqs*train_size) + ['val'] * int(n_seqs*test_size) + ['test'] * int(n_seqs*test_size)
+        df['split'] = group
+        self.df = df
+
+    def get_split(self, split_name: str, transform=None, target_transform=None):        
+        splitted_df = self.df[self.df['split'] == split_name].copy()
+        new_dataset = CombinationDataset(split=split_name,
+                                         transform=transform,
+                                         target_transform=target_transform)
+        new_dataset.df = splitted_df
+        targets = new_dataset.df.target.to_numpy()
+        seq = new_dataset.df.sequence.to_numpy()
+        new_dataset.ds = {"targets": targets, "seq": seq}
+        new_dataset.name_for_split_info = new_dataset.prefix
+        return new_dataset
+
+'''def generation(length, gc_content, random_state):
     gc = int(length * gc_content)
     at = length - gc
     seqs = choices(['G', 'C'], k=gc) + choices(['A', 'T'], k=at)
     shuffle(seqs)
-    return ''.join(seqs)
+    return ''.join(seqs)'''
 
 def activity(x, coef):
     return 1/(1 + np.exp(5-10*x/coef))
+    #return -(2*x / coef - 1)**2 + 1
+    #return -(0.4*x / coef - 0.2)**2 + 0.04
