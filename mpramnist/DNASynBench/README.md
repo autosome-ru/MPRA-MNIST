@@ -16,6 +16,7 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/DNASynBench
 | task_4  | Alien motif                 | 2               | Classification            |
 | task_5  | Motif combination           | 2               | Classification            |
 | task_6  | Distance dependent activity | 2               | Classification            |
+| task_7  | Order dependent activity    | 2               | Classification            |
 
 ### 1) Motif presence
 Binary classification task to find the motif in the sequence.
@@ -66,6 +67,14 @@ Binary classification task that suppose the activity only if the motifs are loca
 | required | required |  200   |    50    | 10000  |  0.2  |    0.41    |       0.7      |      42      |
 
 <img width="457" height="104" alt="6_eng" src="https://github.com/user-attachments/assets/d755ea5d-f771-48d4-9e73-1944c5de20c0" />
+
+### 7) Order dependent activity
+Binary classification task that implies that the activity depends on order of first and second motifs.
+
+**Settings:**
+|  motif   |  alien   | length | n_seqs | ratio | rat_al | gc_content |   train_size   | random_state |
+|----------|----------|--------|--------|-------|--------|------------|----------------|--------------|
+| required | required |  200   | 10000  |  0.8  |  0.8   |    0.41    |       0.7      |      42      |
 
 ## Dataset parameters
 #### **`split: str`**, optional
