@@ -11,9 +11,10 @@ import torch.nn.functional as F
 from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 from itertools import cycle
+from scipy import stats
 
 class LitModel_DNASyn_REG(L.LightningModule):
-    def __init__(self, model, loss, print_each, weight_decay=1e-2, lr=3e-4):
+    def __init__(self, model, print_each, loss=nn.MSELoss(), weight_decay=1e-2, lr=3e-4, show_figure=True):
         super().__init__()
 
         self.model = model
@@ -26,6 +27,14 @@ class LitModel_DNASyn_REG(L.LightningModule):
         self.train_pearson = PearsonCorrCoef()
         self.val_pearson = PearsonCorrCoef()
         self.test_pearson = PearsonCorrCoef()
+        
+        self.show_figure = show_figure
+        self.test_predictions = []
+        self.test_targets = []
+        
+        self.train_pearson_history = []
+        self.val_pearson_history = []
+        self.epochs_history = []
 
     def forward(self, x):
         return self.model(x)
@@ -54,6 +63,10 @@ class LitModel_DNASyn_REG(L.LightningModule):
     def on_validation_epoch_end(self):
         train_pearson = self.train_pearson.compute()
         val_pearson = self.val_pearson.compute()
+        
+        self.train_pearson_history.append(train_pearson.item())
+        self.val_pearson_history.append(val_pearson.item())
+        self.epochs_history.append(self.current_epoch)
 
         self.log("val_pearson", val_pearson, prog_bar=True)
         self.log("train_pearson", train_pearson)
@@ -77,11 +90,65 @@ class LitModel_DNASyn_REG(L.LightningModule):
 
         self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.test_pearson.update(y_hat, y)
+        
+        self.test_predictions.append(y_hat.cpu().detach().float())
+        self.test_targets.append(y.cpu().detach().float())
 
     def on_test_epoch_end(self):
         test_pearson = self.test_pearson.compute()
         self.log("test_pearson", test_pearson, prog_bar=True)
+
+        if self.show_figure:
+            self.plot_results(test_pearson)
+        
         self.test_pearson.reset()
+        self.test_predictions = []
+        self.test_targets = []
+
+    def plot_results(self, test_pearson):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+        # plot of predictions ~ labels correlation
+        all_preds = torch.cat(self.test_predictions, dim=0).numpy()
+        all_targets = torch.cat(self.test_targets, dim=0).numpy()
+        
+        ax1.scatter(all_targets, all_preds, alpha=0.5, s=10)
+        min_val = min(all_targets.min(), all_preds.min())
+        max_val = max(all_targets.max(), all_preds.max())
+        ax1.plot([min_val, max_val], [min_val, max_val], 'r--', alpha=0.7, label='y=x')
+
+        slope, intercept, r_value, p_value, std_err = stats.linregress(all_targets, all_preds)
+        regression_line = slope * np.array([min_val, max_val]) + intercept
+        ax1.plot([min_val, max_val], regression_line, 'g--', alpha=0.7,
+                 label='y~x')
+    
+        ax1.set_xlabel('Labels')
+        ax1.set_ylabel('Predictions')
+        
+        model_name = self.model.__class__.__name__
+        title1 = f'{model_name}, Test PearsonR = {test_pearson:.4f}'
+        ax1.set_title(title1)
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        # plot of pearson r dynamic during training
+        epochs = np.array(self.epochs_history)
+        train_pearson = np.array(self.train_pearson_history)
+        val_pearson = np.array(self.val_pearson_history)
+        
+        ax2.plot(epochs, train_pearson, '-', color='green', label='Train PearsonR', linewidth=2)
+        ax2.plot(epochs, val_pearson, '-', color='orange', label='Val PearsonR', linewidth=2)
+        
+        ax2.set_xlabel('Epoch')
+        ax2.set_ylabel('PearsonR')
+        ax2.set_title('PearsonR During Training')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+    
+        plt.tight_layout()
+        plt.show()
+        
+        return fig
 
     def predict_step(self, batch, _):
         x, y = batch
@@ -113,7 +180,7 @@ class LitModel_DNASyn_REG(L.LightningModule):
         }
 
         return [self.optimizer], [lr_scheduler_config]
-
+        
 class LitModel_DNASyn_CLS(L.LightningModule):
     def __init__(
         self,
@@ -247,37 +314,57 @@ class LitModel_DNASyn_CLS(L.LightningModule):
     def calculate_auroc(self, y_score, y_true, n_classes, ax=None):
         y_score = F.softmax(y_score.float(), dim=1).cpu().numpy()
         y_true = y_true.cpu().numpy()
-        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes+1))
-
-        fpr, tpr, roc_auc = dict(), dict(), dict()
-
-        # Compute ROC curve and AUC for each class
+        
+        if n_classes == 2:
+            fpr, tpr, _ = roc_curve(y_true, y_score[:, 1])
+            roc_auc = auc(fpr, tpr)
+            if ax is not None:
+                ax.plot(
+                    fpr,
+                    tpr,
+                    color="orange",
+                    lw=2,
+                    label=f"ROC (AUC = {roc_auc:.2f})",
+                )
+                ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random")
+                ax.set_xlim([-0.05, 1.0])
+                ax.set_ylim([0.0, 1.05])
+                ax.set_xlabel("False Positive Rate")
+                ax.set_ylabel("True Positive Rate")
+                ax.set_title("ROC Curve")
+                ax.legend(loc="lower right")
+            
+            return roc_auc
+        
+        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
+        print(y_true_bin)
+        fpr, tpr, roc_auc = {}, {}, {}
         for i in range(n_classes):
             fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_score[:, i])
+            #print(fpr, tpr)
             roc_auc[i] = auc(fpr[i], tpr[i])
-
         if ax is not None:
             colors = cycle(
                 ["orange", "green", "red", "purple", "blue", "yellow", "cyan", "brown"]
             )
-
-            # Plot ROC curves for each class
             for i, color in zip(range(n_classes), colors):
                 ax.plot(
                     fpr[i],
                     tpr[i],
                     color=color,
-                    lw=1,
-                    label=f"Class {i} (AUC = {roc_auc[i]:0.2f})",
+                    lw=2,
+                    label=f"Class {i} (AUC = {roc_auc[i]:.2f})",
                 )
-
-            ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random (AUC = 0.5)")
+    
+            ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random")
             ax.set_xlim([-0.05, 1.0])
             ax.set_ylim([0.0, 1.05])
             ax.set_xlabel("False Positive Rate")
             ax.set_ylabel("True Positive Rate")
             ax.set_title("ROC Curve")
             ax.legend(loc="lower right")
+    
+        return roc_auc
 
     def plot_hist(self, y_score, y_true, n_classes, ax=None):
         y_score = F.softmax(y_score.float(), dim=1).cpu().numpy()
