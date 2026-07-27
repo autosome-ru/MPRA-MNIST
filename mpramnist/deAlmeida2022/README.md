@@ -10,7 +10,7 @@ The data is split into training (native sequences, ~80%), validation (sequences 
 
 Therefore, we recommend using the corresponding transform: `ReverseComplement(0.5)` if you disable the built-in augmentation (see parameter `use_original_reverse_complement`).
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/DeepStarrDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/deAlmeida2022/deAlmeida_example.ipynb) for detailed usage example and training
 
 ## Tasks
 
@@ -85,77 +85,78 @@ Root directory for data storage.
 
 4) **Reverse Complement Augmentation**: The `use_original_reverse_complement` parameter controls the built-in augmentation logic from the original paper. If set to `True`/`None` for the training split, the dataset handles augmentation internally. In this case, do not apply a `ReverseComplement` transform manually, as it will duplicate data incorrectly. Use the `transform` parameter only for other sequence manipulations (e.g., `Seq2Tensor`).
 
-5) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/DeepStarrDataset_example.ipynb) for detailed usage example and training
+5) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/deAlmeida2022/deAlmeida_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    import mpramnist
-    from mpramnist.DeepStarr.dataset import DeepStarrDataset
-    import torch.utils.data as data
-    import mpramnist.transforms as t
+from mpramnist.deAlmeida2022.dataset import deAlmeidaDataset
+from mpramnist.deAlmeida2022.trainer import LitModel_deAlmeida
+
+from torch.utils.data import DataLoader
+import mpramnist.transforms as t
 ```
 
 ### 2) Initialize transforms
 
 ```python
-    # For use with `use_original_reverse_complement=True/None` (default)
-    train_transform = t.Compose([t.Seq2Tensor()]) # t.ReverseComplement is NOT needed here
-    val_test_transform = t.Compose([t.Seq2Tensor()])
+# For use with `use_original_reverse_complement=True/None` (default)
+train_transform = t.Compose([t.Seq2Tensor()]) # t.ReverseComplement is NOT needed here
+val_test_transform = t.Compose([t.Seq2Tensor()])
 
-    # For use with `use_original_reverse_complement=False` (custom augmentation)
-    train_transform_custom = t.Compose([t.ReverseComplement(0.5), t.Seq2Tensor()])
+# For use with `use_original_reverse_complement=False` (custom augmentation)
+train_transform_custom = t.Compose([t.ReverseComplement(0.5), t.Seq2Tensor()])
 ``` 
 
 ### 3) Dataset Creation
 
 ```python
-    # --- Using the ORIGINAL paper's augmentation strategy (RECOMMENDED) ---
-    # Training data: augmentation is applied internally, dataset size is 2x.
-    train_data = DeepStarrDataset(split="train", cell_type="Dev_log2", transform=train_transform)
-    # Validation/Test data: no internal augmentation.
-    val_data = DeepStarrDataset(split="2L", cell_type="Hk_log2", transform=val_test_transform)
+# --- Using the ORIGINAL paper's augmentation strategy (RECOMMENDED) ---
+# Training data: augmentation is applied internally, dataset size is 2x.
+train_data = deAlmeidaDataset(split="train", cell_type="Dev_log2", transform=train_transform)
+# Validation/Test data: no internal augmentation(because validation data).
+val_data = deAlmeidaDataset(split="2L", cell_type="Dev_log2", transform=val_test_transform)
 
-    # Multi-task data (both activities)
-    multi_data = DeepStarrDataset(split="test", cell_type=["Dev_log2", "Hk_log2"], transform=val_test_transform)
+# Multi-task data (both activities)
+multi_data = deAlmeidaDataset(split="test", cell_type=["Dev_log2", "Hk_log2"], transform=val_test_transform)
 
-    # --- Using CUSTOM augmentation (disable internal logic) ---
-    train_data_custom = DeepStarrDataset(
-        split="train",
-        use_original_reverse_complement=False, # Disable internal augmentation
-        cell_type="Dev_log2",
-        transform=train_transform_custom # Apply your own transform
-    )
+# --- Using CUSTOM augmentation (disable internal logic) ---
+train_data_custom = deAlmeidaDataset(
+    split="train",
+    use_original_reverse_complement=False, # Disable internal augmentation
+    cell_type="Dev_log2",
+    transform=train_transform_custom # Apply your own transform
+)
 
-    # Load data filtered by genomic regions (exclude regions in BED file)
-    region_data = DeepStarrDataset(
-        split="train",
-        genomic_regions="path/to/regions.bed",
-        exclude_regions=True,
-        transform=train_transform
-    )
+# Load data filtered by genomic regions (exclude regions in BED file)
+region_data = deAlmeidaDataset(
+    split="train",
+    genomic_regions="path/to/regions.bed",
+    exclude_regions=True,
+    transform=train_transform
+)
 
-    # Load a custom chromosome split
-    custom_split_data = DeepStarrDataset(
-        split=["2L", "2R", "3L"],
-        cell_type="Dev_log2",
-        transform=train_transform
-    )
+# Load a custom chromosome split
+custom_split_data = deAlmeidaDataset(
+    split=["2L", "2R", "3L"],
+    cell_type="Dev_log2",
+    transform=train_transform
+)
 ```
 
 ### 4) Dataloader Creation
 
 ```python 
-    train_loader = data.DataLoader(
+    train_loader = DataLoader(
     dataset=train_dataset, 
     batch_size=1024, 
     shuffle=True,           # Shuffle is recommended for training
     num_workers=8
 )
 
-val_loader = data.DataLoader(
+val_loader = DataLoader(
     dataset=val_dataset, 
     batch_size=1024, 
     shuffle=False,          # No need to shuffle for validation/testing
@@ -166,35 +167,26 @@ val_loader = data.DataLoader(
 ## Launch Parameters
 
 ```bash
-    #MPRALegNet
-    python3 deAlmeida_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_legnet.tsv
-    #Malinois
-    python3 deAlmeida_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_malinois.tsv
-    #MPRAnn
-    python3 deAlmeida_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_mprann.tsv
-    #PARM
-    python3 deAlmeida_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_parm.tsv
-    #DeepStarr
-    python3 deAlmeida_model_launch.py --model DeepStarr --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_deepstarr.tsv
-
+#MPRALegNet
+python3 deAlmeida_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 1 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_legnet_test.tsv
+#Malinois
+python3 deAlmeida_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_malinois.tsv
+#MPRAnn
+python3 deAlmeida_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_mprann.tsv
+#PARM
+python3 deAlmeida_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_parm.tsv
+#DeepStarr
+python3 deAlmeida_model_launch.py --model DeepStarr --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_deepstarr.tsv
+#DREAM-RNN
+python3 deAlmeida_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 1 --runs 1 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_dream_rnn.tsv
 ```
 
-## Original Benchmark Quality
+## Achieved Performance Using Basic Models
 
-Pearson correlation, r
-
- - r = 0,68 for **developmental** activity
-
- - r = 0,74 for **housekeeping** activity
-    
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-Pearson correlation, r
-
- - r = 0,67 for **developmental** activity
-
- - r = 0,76 for **housekeeping** activity
+| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
+|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
+| Developmental | 0,68 | 0,718 | 0,7121 | 0.6871 | 0.7117 | 0.7295 |
+| Housekeeping | 0,74 | 0,786 | 0,7815 | 0.7751 | 0.7845 | 0.7986 |
 
 ## Citation
 
