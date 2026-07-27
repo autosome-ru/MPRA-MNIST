@@ -40,7 +40,7 @@ general.add_argument("--device",
                      default=0)
 general.add_argument("--num_workers",
                      type=int, 
-                     default=103)
+                     default=8)
 general.add_argument("--batch_size",
                      type=int, 
                      default=1024)
