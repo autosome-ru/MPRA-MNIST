@@ -16,12 +16,12 @@ class LitModel_Ernst(L.LightningModule):
         self.weight_decay = weight_decay
         self.lr = lr
 
+        if isinstance(cell_types, str):
+            cell_types = [cell_types]
+
         num_outputs = len(cell_types)
 
         self.num_outputs = num_outputs
-
-        if isinstance(cell_types, str):
-            cell_types = [cell_types]
 
         self.cell_types = cell_types
 
@@ -42,8 +42,10 @@ class LitModel_Ernst(L.LightningModule):
 
     def training_step(self, batch, batch_nb):
         
-        X, y = batch
-        y_hat = self.forward(X)
+        x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.forward(x)
                   
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
         
@@ -60,6 +62,8 @@ class LitModel_Ernst(L.LightningModule):
     def validation_step(self, batch, batch_idx):
 
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
@@ -132,6 +136,8 @@ class LitModel_Ernst(L.LightningModule):
 
     def test_step(self, batch, _):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
@@ -155,6 +161,8 @@ class LitModel_Ernst(L.LightningModule):
 
     def predict_step(self, batch, _):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         pred = self.forward(x)
 
         pred, y = self.labels_and_predicted_unsqueeze(pred, y) # [1076] -> [1076, 1]
