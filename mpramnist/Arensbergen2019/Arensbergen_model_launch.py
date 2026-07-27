@@ -15,6 +15,8 @@ from mpramnist.models import L1KLmixed
 from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
+
+from mpramnist.models import DREAM_RNN
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -95,7 +97,7 @@ else:
             cell_types.append(genome_id + "_" + cell)
     results = pd.DataFrame(columns = cell_types)
 
-if args.model == "Malinois":
+if args.model == "Malinois" or  args.model == "DREAM_RNN" or args.model == "DREAM-RNN":
     train_transform = t.Compose([t.Padding(600), t.LeftCrop(600, 600), t.ReverseComplement(0.5),t.Seq2Tensor(sequence_first=True),])
     test_transform = t.Compose([t.Padding(600), t.LeftCrop(600, 600), t.Seq2Tensor(sequence_first=True),])
     forw_transform = t.Compose([t.Padding(600), t.LeftCrop(600, 600), t.Seq2Tensor(sequence_first=True)])
@@ -166,6 +168,10 @@ for run in list(range(args.runs)):
         elif args.model == "PARM":
             model = PARM(n_block=5, type_loss="mse", output_dim=len(args.cell_types))
             loss =nn.MSELoss()
+        elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+            length = 600
+            model = DREAM_RNN(in_channels=len(train_dataset[0][0][0]), seqsize=length, out_channels=len(args.cell_types))
+            loss = nn.MSELoss()
 
         seq_model = LitModel_Arensbergen_Reg(model=model, cell_types=args.cell_types, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1)
 

@@ -2,7 +2,7 @@
 
 ## Main information
 
-The Arensbergen's SuRE dataset (Survey of Regulatory Elements) is based on the analysis of genomes from 4 individuals from 4 different populations ([van Arensbergen et al. 2017](https://pubmed.ncbi.nlm.nih.gov/28024146/)) and was scaled up by [van Arensbergen et al. (2019)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6609452/). The genomes of these individuals are fragmented into 150–500 bp sequences, each cloned into a reporter plasmid. These fragments can drive expression if they contain a functional promoter. Approximately 2.4B and 1.2B fragments were tested (assayed) in K562 and HepG2 cells, respectively.
+The **episomal** Arensbergen's SuRE dataset (Survey of Regulatory Elements) is based on the analysis of genomes from 4 individuals from 4 different populations ([van Arensbergen et al. 2017](https://pubmed.ncbi.nlm.nih.gov/28024146/)) and was scaled up by [van Arensbergen et al. (2019)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6609452/). The genomes of these individuals are fragmented into 150–500 bp sequences, each cloned into a reporter plasmid. These fragments can drive expression if they contain a functional promoter. Approximately 2.4B and 1.2B fragments were tested (assayed) in K562 and HepG2 cells, respectively.
 
 Preprocessed data and code were integrated from the work of [Reddy et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC10002662/) ([GitHub](https://github.com/anikethjr/promoter_models/blob/main/promoter_modelling/dataloaders/SuRE.py). Following their subsampling methodology, separate datasets are created for each individual. This subsampling controls for GC content and expression level distribution. The final datasets contain approximately 400-600K training sequences and 50-70K test and validation sequences per individual.
 
@@ -50,7 +50,7 @@ Each element is associated with two continuous values representing its average r
     19      19483672	19484047    +       train    ACAAAAGACTCTGA...           22.666 	 6.5
 ```
 
-See [Sure Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/SureDataset_example.ipynb]) for detailed information.
+See [Arensbergen Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Arensbergen2019/ArensbergenDataset_example.ipynb) for detailed information.
 
 ## Parameters
 
@@ -107,20 +107,24 @@ Root directory where data is stored. If None, uses default data path.
 
 2) **Genomic Coordinates**: Use the `genomic_regions` and `exclude_regions` parameters to select or exclude specific genomic regions across chromosomes in the dataset. *Uses 0-based indexing for genomic coordinates.*
 
-3) **Example Usage**: See [Sure Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/SureDataset_example.ipynb]) for detailed usage example and training
+3) **Example Usage**: See [Sure Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Arensbergen2019/ArensbergenDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1)  Import Important Packages and Create Padding Function
 
 ```python
-    import torch
-    import mpramnist
     from torch.nn.utils.rnn import pad_sequence
-    from mpramnist.Sure.dataset import SureDataset
-    import torch.utils.data as data
 
-    def pad_collate(batch):  # required because sequence lengths vary
+    from mpramnist.Arensbergen2019.dataset import ArensbergenDataset
+    from mpramnist.Arensbergen2019.trainer import LitModel_Arensbergen_Reg
+
+    import mpramnist.transforms as t
+
+    from torch.utils.data import DataLoader
+
+    # pad_collate to handle batches of variable-length sequences. It pads shorter sequences with N so all items in the batch have the same shape
+    def pad_collate(batch):
         (seq, targets) = zip(*batch)
         seq = pad_sequence(seq, 
                         batch_first=True, 
@@ -150,10 +154,10 @@ Root directory where data is stored. If None, uses default data path.
 
 ```python
     # Load training data for classification from one genome
-    train_dataset = SureDataset(
+    train_dataset = ArensbergenDataset(
         split="train",
         genome_id="SuRE42_HG02601", 
-        task="classification",
+        task="regression",
         transform = train_transform
     )
 
@@ -181,7 +185,7 @@ Root directory where data is stored. If None, uses default data path.
 
 ```python
     # Create DataLoader for training
-    train_loader = data.DataLoader(
+    train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=1024,
         shuffle=True,  # shuffle for training
@@ -191,7 +195,7 @@ Root directory where data is stored. If None, uses default data path.
     )
 
     # Create DataLoader for validation
-    val_loader = data.DataLoader(
+    val_loader = DataLoader(
         dataset=dataset,
         batch_size=1024,
         shuffle=False,  # no shuffle for validation or test
@@ -205,13 +209,15 @@ Root directory where data is stored. If None, uses default data path.
 
 ```bash
     #MPRALegNet
-    python3 Arensbergen_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 --cell_types HepG2 K562 --result_dir ./Arensbergen_legnet.tsv
+    python3 Arensbergen_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 SuRE43_GM18983 SuRE44_HG01241 SuRE45_HG03464 --cell_types HepG2 K562 --result_dir ./Arensbergen_legnet.tsv
     #Malinois
-    python3 Arensbergen_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 --cell_types HepG2 K562 --result_dir ./Arensbergen_malinois.tsv
+    python3 Arensbergen_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 SuRE43_GM18983 SuRE44_HG01241 SuRE45_HG03464 --cell_types HepG2 K562 --result_dir ./Arensbergen_malinois.tsv
     #MPRAnn
-    python3 Arensbergen_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 --cell_types HepG2 K562 --result_dir ./Arensbergen_mprann.tsv
+    python3 Arensbergen_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 SuRE43_GM18983 SuRE44_HG01241 SuRE45_HG03464 --cell_types HepG2 K562 --result_dir ./Arensbergen_mprann.tsv
     #PARM
-    python3 Arensbergen_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 --cell_types HepG2 K562 --result_dir ./Arensbergen_parm.tsv
+    python3 Arensbergen_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 SuRE43_GM18983 SuRE44_HG01241 SuRE45_HG03464 --cell_types HepG2 K562 --result_dir ./Arensbergen_parm.tsv
+    #DREAM-RNN
+    python3 Arensbergen_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --genome_ids SuRE42_HG02601 SuRE43_GM18983 SuRE44_HG01241 SuRE45_HG03464 --cell_types HepG2 K562 --result_dir ./Arensbergen_dream_rnn.tsv
 ```
 
 ## Original Benchmark Quality
@@ -220,12 +226,16 @@ No other study has used this data for pretraining, so we don't have information 
 
 ## Achieved Quality Using LegNet Model
 
-| Genome ID | K562 Regression | HepG2 Regression | K562 Classification | HepG2 Classification |
-|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|
-| SuRE42_HG02601 | <span style="color:green">0.511</span> | <span style="color:orange">0.357</span> | --- | --- |
-| SuRE43_GM18983 | <span style="color:green">0.497</span> | <span style="color:orange">0.343</span> | --- | --- |
-| SuRE44_HG01241 | <span style="color:blue">0.573</span> | <span style="color:red">0.317</span> | --- | --- |
-| SuRE45_HG03464 | <span style="color:purple">**0.624**</span> | <span style="color:red">0.320</span> | --- | --- |
+| Cell Type | Genome ID | Original Performance | MPRALegNet | MPRAnn | Malinois | PARM | DREAM-RNN |
+|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|:--------------------:|
+| HepG2 | SuRE42_HG02601 | #N/A | 0,359 | 0,2952 | 0.352 | 0.3265 | 0.3345 |
+| K562 | SuRE42_HG02601 | #N/A | 0,51 | 0,4352 | 0.5105 | 0.4865 | 0.4831 |
+| HepG2 | SuRE43_GM18983 | #N/A | 0,345 | 0,2887 | 0.3442 | 0.3186 | 0.3356 |
+| K562 | SuRE43_GM18983 | #N/A | 0,495 | 0,4263 | 0.4977 | 0.4674 | 0.4878 |
+| HepG2 | SuRE44_HG01241 | #N/A | 0,307 | 0,2433 | 0.2979 | 0.2804 | 0.318 |
+| K562 | SuRE44_HG01241 | #N/A | 0,578 | 0,5253 | 0.5688 | 0.55 | 0.5831 |
+| HepG2 | SuRE45_HG03464 | #N/A | 0,322 | 0,2611 | 0.3161 | 0.2809 | 0.2799 |
+| K562 | SuRE45_HG03464 | #N/A | 0,617 | 0,5672 | 0.6204 | 0.5998 | 0.5873 |
 
 ## Citation
 

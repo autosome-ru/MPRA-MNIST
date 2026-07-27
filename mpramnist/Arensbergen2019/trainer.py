@@ -54,7 +54,9 @@ class LitModel_Arensbergen_Reg(L.LightningModule):
 
     def training_step(self, batch, batch_nb):
         X, y = batch
-        y_hat = self.model(X.permute(0, 2, 1))
+        if X.ndim == 3 and X.shape[2] < X.shape[1]:
+            X = X.permute(0, 2, 1)
+        y_hat = self.model(X)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
 
@@ -68,7 +70,9 @@ class LitModel_Arensbergen_Reg(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x.permute(0, 2, 1))
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.model(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
 
@@ -139,7 +143,9 @@ class LitModel_Arensbergen_Reg(L.LightningModule):
 
     def test_step(self, batch, _):
         x, y = batch
-        y_hat = self.model(x.permute(0, 2, 1))
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.model(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
 
@@ -161,7 +167,9 @@ class LitModel_Arensbergen_Reg(L.LightningModule):
 
     def predict_step(self, batch, _):
         x, y = batch
-        y_hat = self.model(x.permute(0, 2, 1))
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.model(x)
 
         y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
 
@@ -228,7 +236,9 @@ class LitModel_Arensbergen_Clas(L.LightningModule):
 
     def training_step(self, batch, batch_nb):
         X, y = batch
-        y_hat = self.model(X.permute(0, 2, 1))
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.model(x)
         y = y.long()
 
         loss = self.loss(y_hat[:, 0:5], y[:, 0])
@@ -242,7 +252,9 @@ class LitModel_Arensbergen_Clas(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x.permute(0, 2, 1))
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.model(x)
         y = y.long()
 
         loss = self.loss(y_hat[:, 0:5], y[:, 0])
@@ -264,7 +276,9 @@ class LitModel_Arensbergen_Clas(L.LightningModule):
 
     def test_step(self, batch, _):
         x, y = batch
-        y_hat = self.model(x.permute(0, 2, 1))
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.model(x)
         y = y.long()
 
         loss = self.loss(y_hat[:, 0:5], y[:, 0])
