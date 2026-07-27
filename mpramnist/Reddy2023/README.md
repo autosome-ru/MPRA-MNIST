@@ -2,7 +2,7 @@
 
 ## Main Information
 
-The Fluorescence dataset ([Reddy AJ et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC10002662/)) is based on a lentiviral MPRA screen designed to measure the enhancer activity of synthetic promoters in three immune cell lines: Jurkat (T cells), K562 (lymphoblasts), and THP-1 (monocytes).
+The Fluorescence dataset ([Reddy AJ et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC10002662/)) is based on a **lentiviral** MPRA screen designed to measure the enhancer activity of synthetic promoters in three immune cell lines: Jurkat (T cells), K562 (lymphoblasts), and THP-1 (monocytes).
 
 The dataset comprises 17,104 designed promoter sequences of 250 bp length, which were strategically selected to maximize the discovery of differentially active promoters. The promoters fall into three classes: sequences from endogenous differentially expressed genes (~50%), sequences tiled with motifs enriched in such genes (~40%), and sequences from constitutively highly expressed genes (~10%).
 
@@ -10,7 +10,7 @@ Each promoter was cloned upstream of a minimal CMV promoter driving an EGFP repo
 
 The data is split into training (70%), validation (10%), and test (20%) sets, stratified by promoter class and GC content.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/FluorescenceDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Reddy2023/ReddyDataset_example.ipynb) for detailed usage example and training
 
 ### Target Variable: Activity Score Calculation
 
@@ -104,17 +104,19 @@ If None, uses the default dataset directory from parent class.
 
 3) **Multi-task Learning**: This dataset is designed for multi-task learning, where a single model predicts activities across multiple cell lines simultaneously.
 
-4) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/FluorescenceDataset_example.ipynb) for detailed usage example and training
+4) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Reddy2023/ReddyDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    import mpramnist
-    from mpramnist.Fluorescence.dataset import FluorescenceDataset
-    import torch.utils.data as data
+    from mpramnist.Reddy2023 import ReddyDataset
+    from mpramnist.Reddy2023 import LitModel_Reddy_Reg
+
     import mpramnist.transforms as t
+
+    from torch.utils.data import DataLoader
 ```
 
 ### 2) Initialize transforms
@@ -138,11 +140,10 @@ If None, uses the default dataset directory from parent class.
 
 ```python
     # Basic usage with default settings (all cell types)
-    train_dataset = FluorescenceDataset(split='train', transform = transform)
-
+    train_dataset = ReddyDataset(split='train', transform = transform)
     
     # Specific cell type for regression
-    dataset = FluorescenceDataset(
+    dataset = ReddyDataset(
         split='val',
         cell_type='K562',    # Use only K562 cell line
         task='regression',
@@ -155,14 +156,14 @@ If None, uses the default dataset directory from parent class.
 ### 4) Dataloader Creation
 
 ```python 
-    train_loader = data.DataLoader(
+    train_loader = DataLoader(
         dataset=train_dataset, 
         batch_size=1024, 
         shuffle=True, # Shuffle is recommended for training
         num_workers=16 
     )
 
-    val_loader = data.DataLoader(
+    val_loader = DataLoader(
         dataset=val_dataset,
         batch_size=1024,
         shuffle=False, # No need to shuffle for validation/testing
@@ -170,27 +171,30 @@ If None, uses the default dataset directory from parent class.
     )
 ```
 
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 ReddyReg_model_launch.py --model MPRALegNet --lr 1e-2 --wd 1e-1 --result_dir ./Reddy_legnet.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#Malinois
+python3 ReddyReg_model_launch.py --model Malinois --lr 1e-2 --wd 1e-1 --result_dir ./Reddy_malinois.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#MPRAnn
+python3 ReddyReg_model_launch.py --model MPRAnn --lr 1e-2 --wd 1e-1 --result_dir ./Reddy_mprann.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#PARM
+python3 ReddyReg_model_launch.py --model PARM --lr 1e-2 --wd 1e-1 --result_dir ./Reddy_parm.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#DREAM-RNN
+python3 ReddyReg_model_launch.py --model DREAM-RNN --lr 1e-2 --wd 1e-1 --result_dir ./Reddy_dream-rnn.tsv --batch_size 1024 --epoch_num 50 --runs 5
+```
+
 ## Original Benchmark Quality
 
 Pearson correlation, r
 
- - r = 0,615 for **K562**
-
- - r = 0,599 for **JURKAT**
-
- - r = 0,555 for **THP-1**
-
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-Pearson correlation, r
-
- - r = 0,63 for **K562**
-
- - r = 0,62 for **JURKAT**
-
- - r = 0,52 for **THP-1**
-
+| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
+|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
+| HepG2 | 0,615 | 0,592 | 0,5202 | 0,5137 | 0,6411 | 0.5999 |
+| K562 | 0,599 | 0,604 | 0,5322 | 0,4931 | 0,63 | 0.5867 |
+| WTC11 | 0,555 | 0,507 | 0,4623 | 0,4516 | 0,5701 | 0.5347 |
 
 ## Citation
 
