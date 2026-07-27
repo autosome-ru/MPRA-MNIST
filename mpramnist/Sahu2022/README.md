@@ -32,7 +32,7 @@ This is a **separate assay dataset** (not a STARR-seq library) from the same stu
 
 This library tests promoter-enhancer interactions using pairs of random 150-bp sequences. It includes: active promoter + matched active enhancer pairs; active promoter + shuffled active enhancer pairs; active promoter + inactive enhancer pairs; and inactive promoter + active enhancer pairs. Activity was measured via STARR-seq in GP5d and HepG2 cells. **The task is binary classification: predict whether a given promoter-enhancer pair is active.** We use the original split: 2,991,302 training, 748,828 validation, and 1,252,044 test sequences.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/Malinois_Dataset_example_model_legnet.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Sahu2022/SahuDataset_example.ipynb) for detailed usage example and training
 
 ## Tasks
 
@@ -120,17 +120,19 @@ Function to apply transformations to the target labels.
 
 5) For the `"binary"` task, each data point returns a tuple: `(seq, seq_enh, label)`, where the label indicates whether the pair is active (`1`) or inactive (`0`).
 
-6) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/Malinois_Dataset_example_model_legnet.ipynb) for detailed usage example and training
+6) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Sahu2022/SahuDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    from mpramnist.StarrSeq.dataset import StarrSeqDataset
-    from mpramnist.trainers import LitModel_StarrSeq
+    from mpramnist.Sahu2022 import SahuDataset
+    from mpramnist.Sahu2022 import LitModel_Sahu
+
     from mpramnist import transforms as t
-    import torch.utils.data as data
+
+    from torch.utils.data import DataLoader
 ```
 
 ### 2) Initialize transforms
@@ -151,32 +153,32 @@ Function to apply transformations to the target labels.
 ```python
 
     # Random Enhancer task
-    ranenh_dataset = StarrSeqDataset(
+    ranenh_dataset = SahuDataset(
         task="randomenhancer", split="train", transform=train_transform, root="../data"
     )
 
     # Genomic Promoter task
-    genp_dataset = StarrSeqDataset(
+    genp_dataset = SahuDataset(
         task="genomicpromoter", split="train", transform=train_transform, root="../data/"
     )
 
     # Capture Promoter task
-    capt_dataset = StarrSeqDataset(
+    capt_dataset = SahuDataset(
         task="capturepromoter", split="train", transform=train_transform, root="../data/"
     )
 
     # Genomic Enhancer task
-    genenh_dataset = StarrSeqDataset(
+    genenh_dataset = SahuDataset(
         task="genomicenhancer", split="train", transform=train_transform, root="../data/"
     )
 
     # ATAC-seq task
-    atacseq_dataset = StarrSeqDataset(
+    atacseq_dataset = SahuDataset(
         task="atacseq", split="train", transform=train_transform, root="../data/"
     )
 
     # Binary task - Standard dataset
-    classic_binary_dataset = StarrSeqDataset(
+    classic_binary_dataset = SahuDataset(
         task="binary",
         binary_class=None,
         split="train",
@@ -185,7 +187,7 @@ Function to apply transformations to the target labels.
     )
 
     # Binary task - Specialized training variant
-    binary_enh_permut_dataset = StarrSeqDataset(
+    binary_enh_permut_dataset = SahuDataset(
         task="binary",
         binary_class="enhancer_permutated",
         split="train",
@@ -194,7 +196,7 @@ Function to apply transformations to the target labels.
     )
 
     # Validation split
-    val_dataset = StarrSeqDataset(
+    val_dataset = SahuDataset(
         task="binary", split="val", transform=val_test_transform, root="../data/"
     )
   
@@ -204,41 +206,41 @@ Function to apply transformations to the target labels.
 
 ```python 
     train_loader = data.DataLoader(
-        dataset=train_dataset, batch_size=128, shuffle=True, num_workers=8
+        dataset=train_dataset, batch_size=1024, shuffle=True, num_workers=8
     )
 
     val_loader = data.DataLoader(
-        dataset=val_dataset, batch_size=128, shuffle=False, num_workers=8
+        dataset=val_dataset, batch_size=1024, shuffle=False, num_workers=8
     )
 
+```
+
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 Sahu_model_launch.py --model MPRALegNet --lr 1e-3 --wd 1e-1 --epoch_num 10 --runs 5 --result_dir ./Sahu_legnet.tsv
+#Malinois
+python3 Sahu_model_launch.py --model Malinois --lr 1e-3 --wd 1e-1 --epoch_num 10 --runs 5 --result_dir ./Sahu_malinois.tsv
+#MPRAnn
+python3 Sahu_model_launch.py --model MPRAnn --lr 1e-3 --wd 1e-1 --epoch_num 10 --runs 5 --result_dir ./Sahu_mprann.tsv
+#PARM
+python3 Sahu_model_launch.py --model PARM --lr 1e-3 --wd 1e-1 --epoch_num 10 --runs 5 --result_dir ./Sahu_parm.tsv
+#DREAM-RNN
+python3 Sahu_model_launch.py --model DREAM_RNN --lr 1e-3 --wd 1e-1 --epoch_num 10 --runs 5 --result_dir ./Sahu_dream_rnn.tsv
 ```
 
 ## Original Benchmark Quality
 
 **Metric Area Under Precision-Recall Curve (AUPRC)**
 
-| Dataset | Model Performance (from Sahu et al. 2022) | 
-|-----------|:---------------:|
-| Random Enhancer | 0.65 | 
-| Genomic Enhancer | 0.8 | 
-| Capture Promoter | 0.95 | 
-| Genomic Promoter | 0.98 | 
-| ATACseq | 0.9 | 
-| Binary | 0.873 | 
-
-    
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-**Metric Area Under Precision-Recall Curve (AUPRC)**
-
-| Dataset | LegNet Performance | 
-|-----------|:---------------:|
-| Random Enhancer | 0.625 | 
-| Genomic Enhancer | 0.77 | 
-| Capture Promoter | 0.926 | 
-| Genomic Promoter | 0.965 | 
-| ATACseq | 0.907 | 
-| Binary | 0.87 | 
+| Cell type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| GP5d | Random Enhancer | 0,65 | 0,624 | 0,6101 | 0,6153 | 0,6212 | 0,5978 |
+| GP5d & HepG2 | Genomic Enhancer | 0,8 | 0,717 | 0,7664 | 0,9646 | 0,9701 | 0,9305 |
+| GP5d | Capture Promoter | 0,95 | 0,928 | 0,922 | 0,8926 | 0,9226 | 0,8284 |
+| GP5d | Genomic Promoter | 0,98 | 0,967 | 0,9463 | 0,7204 | 0,7603 | 0,76 |
+| GP5d & HepG2 | Binary Experiment | 0,87 | 0,873 | 0,8503 | 0,8528 | 0,8679 | 0,8625 |
  
 ## Citation
 

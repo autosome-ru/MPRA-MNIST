@@ -366,3 +366,33 @@ class LitModel_Sahu_binary_parm(LitModel_Sahu_binary_legnet):
 
             out = self.head(concat).squeeze(1)
             return out, labels
+
+class LitModel_Sahu_binary_dream_rnn(LitModel_Sahu_binary_legnet):
+    def __init__(
+        self, weight_decay, lr, model=None, loss=nn.BCEWithLogitsLoss(), print_each=1
+    ):
+        super().__init__(
+            model=model,
+            loss=loss,
+            print_each=print_each,
+            weight_decay=weight_decay,
+            lr=lr,
+        )
+        out_ch = 256  # размер эмбеддинга из AutosomeFinalLayersBlockBinary
+        output_dim = 1
+
+        self.linear1 = nn.Linear(out_ch * 2, output_dim)
+
+    def head(self, seq):
+        seq = self.linear1(seq)
+        return seq
+
+    def _process_batch(self, batch):
+        seqs, labels = batch
+        enhancer = self.model(seqs["seq_enh"])
+        promoter = self.model(seqs["seq"])
+
+        concat = torch.cat([enhancer, promoter], dim=1)
+
+        out = self.head(concat).squeeze(-1)
+        return out, labels
