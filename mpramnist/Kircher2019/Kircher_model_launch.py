@@ -19,6 +19,7 @@ from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
 
+from mpramnist.models import DREAM_RNN
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -41,7 +42,7 @@ general.add_argument("--device",
                      default=0)
 general.add_argument("--num_workers",
                      type=int, 
-                     default=103)
+                     default=16)
 general.add_argument("--runs",
                      type=int, 
                      default=5)
@@ -125,10 +126,10 @@ def meaned_prediction(forw, rev, trainer, seq_model, name, is_kircher=False):
         )
         y_preds_rev_alt = torch.cat([pred["alt_predicted"] for pred in predictions_rev])
         mean_alt = torch.mean(torch.stack([y_preds_forw_alt, y_preds_rev_alt]), dim=0)
-        pred = mean_alt - mean_forw
+        pred = (mean_alt - mean_forw).squeeze(-1)
         return pears(pred, targets)
 
-    return pears(mean_forw, targets)
+    return pears(mean_forw.squeeze(-1), targets)
 
 
 for run in list(range(args.runs)):
@@ -165,6 +166,10 @@ for run in list(range(args.runs)):
     elif args.model == "PARM":
         model = PARM(n_block=5, type_loss="mse", output_dim=1)
         loss =nn.MSELoss()
+    elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+        length = len(train_dataset[0][0][0])
+        model = DREAM_RNN(len(train_dataset[0][0]), length, 1)
+        loss = nn.MSELoss()
 
     seq_model = LitModel_Kircher(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
 

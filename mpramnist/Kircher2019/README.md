@@ -2,9 +2,9 @@
 
 ## Main Information
 
-The Kircher dataset is based on results from saturating mutagenesis MPRA experiments ([Kircher et al. 2019](https://www.nature.com/articles/s41467-019-11526-w)). The study characterized 44,647 regulatory element variants, including 11 enhancers and 10 promoters across 12 cell lines.
+The Kircher dataset is based on results from **episomal** saturating mutagenesis MPRA experiments ([Kircher et al. 2019](https://www.nature.com/articles/s41467-019-11526-w)). The study characterized 44,647 regulatory element variants, including 11 enhancers and 10 promoters across 12 cell lines.
 
-These experimentally characterized sequences are proposed as a benchmark dataset for validating machine learning model quality. Specifically, models can be trained on independent data (e.g., Agarwal dataset) and their predictive power can be evaluated on the Kircher saturation mutagenesis data (see [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/KircherDataset_example.ipynb)).
+These experimentally characterized sequences are proposed as a benchmark dataset for validating machine learning model quality. Specifically, models can be trained on independent data (e.g., Agarwal dataset) and their predictive power can be evaluated on the Kircher saturation mutagenesis data (see [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Kircher2019/KircherDataset_example.ipynb)).
 
 ### Promoters
 
@@ -193,44 +193,49 @@ Root directory where data is stored. If None, uses default data directory.
     )
 ```
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/KircherDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Kircher2019/KircherDataset_example.ipynb) for detailed usage example and training
 
 ## Launch Parameters
 
 ```bash
-    #MpraLegNet
-    python3 Kircher_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1.2 SORT1-flip --result_dir ./kircher_sort1_legnet.tsv
-    #Malinois
-    python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1.2 SORT1-flip --result_dir ./kircher_sort1_malinois.tsv
-    #MPRAnn
-    python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1.2 SORT1-flip --result_dir ./kircher_sort1_mprann.tsv
-    #PARM
-    python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1.2 SORT1-flip --result_dir ./kircher_sort1_parm.tsv
+#MPRALegNet
+python3 Kircher_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements LDLR LDLR.2 --result_dir ./Kircher_legnet_ldlr.tsv
+python3 Kircher_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements F9 --result_dir ./Kircher_legnet_f9.tsv
+python3 Kircher_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1-flip SORT1.2 --result_dir ./Kircher_legnet_sort.tsv
+python3 Kircher_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types K562 --elements PKLR-24h PKLR-48h --result_dir ./Kircher_mlegnetpklr.tsv
+#Malinois
+python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements LDLR LDLR.2 --result_dir ./Kircher_malinois_ldlr.tsv
+python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements F9 --result_dir ./Kircher_malinois_f9.tsv
+python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1-flip SORT1.2 --result_dir ./Kircher_malinois_sort.tsv
+python3 Kircher_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types K562 --elements PKLR-24h PKLR-48h --result_dir ./Kircher_malinois_pklr.tsv
+#MPRAnn
+python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements LDLR LDLR.2 --result_dir ./Kircher_mprann_ldlr.tsv
+python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements F9 --result_dir ./Kircher_mprann_f9.tsv
+python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1-flip SORT1.2 --result_dir ./Kircher_mprann_sort.tsv
+python3 Kircher_model_launch.py --model MPRAnn --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types K562 --elements PKLR-24h PKLR-48h --result_dir ./Kircher_mprann_pklr.tsv
+#PARM
+python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements LDLR LDLR.2 --result_dir ./Kircher_parm_ldlr.tsv
+python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements F9 --result_dir ./Kircher_parm_f9.tsv
+python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1-flip SORT1.2 --result_dir ./Kircher_parm_sort.tsv
+python3 Kircher_model_launch.py --model PARM --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types K562 --elements PKLR-24h PKLR-48h --result_dir ./Kircher_parm_pklr.tsv
+#DREAM-RNN
+python3 Kircher_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements LDLR LDLR.2 --result_dir ./Kircher_dream_rnn_ldlr.tsv
+python3 Kircher_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements F9 --result_dir ./Kircher_dream_rnn_f9.tsv
+python3 Kircher_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types HepG2 --elements SORT1 SORT1-flip SORT1.2 --result_dir ./Kircher_dream_rnn_sort.tsv
+python3 Kircher_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --cell_types K562 --elements PKLR-24h PKLR-48h --result_dir ./Kircher_dream_rnn_pklr.tsv
 ```
 
-## Original Benchmark Quality
+## Achieved Performance Using Basic Models
 
 Pearson correlation, r 
 
-    r = 0.49 for SORT1 (HepG2)
-    
-    r = 0.65 for PKLR (K562)
+| Cell type | Promoter Type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
+|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
+| HepG2 | SORT1 | #N/A | 0,428 | 0,3901 | 0,314 | 0,4628 | 0,4956 |
+| HepG2 | LDLR | #N/A | 0,442 | 0,3024 | 0,3715 | 0,3998 | 0,4298 |
+| HepG2 | F9 | #N/A | 0,416 | 0,4314 | 0,4918 | 0,4865 | 0,2417 |
+| K562 | PKLR | #N/A | 0,425 | 0,3781 | 0,3812 | 0,425 | 0,134 |
 
-    r = 0.66 for LDLR (HepG2)
-    
-    r = 0.51 for F9 (HepG2)
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-Pearson correlation, r
-
-    r = 0.4 for SORT1 (HepG2)
-    
-    r = 0.54 for PKLR (K562)
-
-    r = 0.66 for LDLR (HepG2)
-    
-    r = 0.52 for F9 (HepG2)
 
 ## Citation
 
