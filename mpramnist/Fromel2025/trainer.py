@@ -107,6 +107,8 @@ class LitModel_Fromel(LitModel):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
         y_hat, y = self._ensure_2d(y_hat, y)
 
@@ -125,6 +127,8 @@ class LitModel_Fromel(LitModel):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
         y_hat, y = self._ensure_2d(y_hat, y)
 
@@ -221,6 +225,8 @@ class LitModel_Fromel(LitModel):
 
     def test_step(self, batch, batch_idx):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
         y_hat, y = self._ensure_2d(y_hat, y)
 
@@ -262,6 +268,8 @@ class LitModel_Fromel(LitModel):
 
     def predict_step(self, batch, batch_idx):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         pred = self.forward(x)
         pred, y = self._ensure_2d(pred, y)
 
