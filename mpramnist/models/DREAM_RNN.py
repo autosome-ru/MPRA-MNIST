@@ -365,6 +365,7 @@ class AutosomeFinalLayersBlock(FinalLayersBlock):
         x = F.adaptive_avg_pool1d(x, 1)
         x = x.squeeze(2) 
         x = self.linear(x)
+        x = x.squeeze(-1)
         # x = self.activation(x)
         # x = self.predictions(x)
         return x
