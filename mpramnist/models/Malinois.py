@@ -223,6 +223,7 @@ class BassetBranched(L.LightningModule):
     def __init__(
         self,
         input_len=600,
+        n_channels=4,  
         conv1_channels=300,
         conv1_kernel_size=19,
         conv2_channels=200,
@@ -246,6 +247,7 @@ class BassetBranched(L.LightningModule):
         super().__init__()
 
         self.input_len = input_len
+        self.n_channels = n_channels
 
         self.conv1_channels = conv1_channels
         self.conv1_kernel_size = conv1_kernel_size
@@ -279,7 +281,7 @@ class BassetBranched(L.LightningModule):
 
         self.pad1 = nn.ConstantPad1d(self.conv1_pad, 0.0)
         self.conv1 = Conv1dNorm(
-            4,
+            self.n_channels,
             self.conv1_channels,
             self.conv1_kernel_size,
             stride=1,
@@ -368,7 +370,7 @@ class BassetBranched(L.LightningModule):
     """
 
     def get_flatten_factor(self, input_len):
-        x = torch.zeros(1, 4, input_len)
+        x = torch.zeros(1, self.n_channels, input_len)
         x = self.pad1(x)
         x = self.conv1(x)
         x = self.maxpool_3(x)
