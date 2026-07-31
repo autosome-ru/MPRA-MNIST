@@ -22,9 +22,9 @@ See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/DNASynBench
 Binary classification task to find the motif in the sequence.
 
 **Settings:**
-|  motif   | length | n_seqs | ratio | gc_content |   train_size   | random_state |
-|----------|--------|--------|-------|------------|----------------|--------------|
-| required |  200   | 10000  |  0.2  |    0.41    |       0.7      |      42      |
+|  motif   | length | n_seqs | ratio |   train_size   | random_state |
+|----------|--------|--------|-------|----------------|--------------|
+| required |  200   | 10000  |  0.2  |       0.7      |      42      |
 
 <img width="456" height="66" alt="1_eng" src="https://github.com/user-attachments/assets/51533320-a829-4f8f-ae2e-2a90b88d937b"/>
 
@@ -32,9 +32,9 @@ Binary classification task to find the motif in the sequence.
 Regression tasks that assume that the activity of a sequence depends linearly or non-linearly on the number of motifs.
 
 **Settings:**
-|  motif   | length | n_seqs | min_num | max_num | gc_content |   train_size   | random_state |
-|----------|--------|--------|---------|---------|------------|----------------|--------------|
-| required |  200   | 10000  |    0    |    5    |    0.41    |       0.7      |      42      |
+|  motif   | length | n_seqs | min_num | max_num |   train_size   | random_state |
+|----------|--------|--------|---------|---------|----------------|--------------|
+| required |  200   | 10000  |    0    |    5    |       0.7      |      42      |
 
 <img width="461" height="114" alt="2_eng" src="https://github.com/user-attachments/assets/d4e7f039-3467-4ae1-92e1-536bb50c3a10" />
 
@@ -42,9 +42,9 @@ Regression tasks that assume that the activity of a sequence depends linearly or
 Binary classification task to find the target motif in the presence of another alien motif that does not affect activity, but can be recognized by models as a regularly occurring element.
 
 **Settings:**
-|  motif   |  alien   | length | n_seqs | ratio | rat_al | gc_content |   train_size   | random_state |
-|----------|----------|--------|--------|-------|--------|------------|----------------|--------------|
-| required | required |  200   | 10000  |  0.2  |  0.2   |    0.41    |       0.7      |      42      |
+|  motif   |  alien   | length | n_seqs | ratio | rat_al |   train_size   | random_state |
+|----------|----------|--------|--------|-------|--------|----------------|--------------|
+| required | required |  200   | 10000  |  0.2  |  0.2   |       0.7      |      42      |
 
 <img width="324" height="150" alt="4_eng" src="https://github.com/user-attachments/assets/eaeb83a7-c98f-479b-bd1d-cfaa256c002d" />
 
@@ -52,9 +52,9 @@ Binary classification task to find the target motif in the presence of another a
 Binary classification task that implies that the activity requires the presence of both target and alien motifs.
 
 **Settings:**
-|  motif   |  alien   | length | n_seqs | ratio | rat_al | gc_content |   train_size   | random_state |
-|----------|----------|--------|--------|-------|--------|------------|----------------|--------------|
-| required | required |  200   | 10000  |  0.2  |  0.2   |    0.41    |       0.7      |      42      |
+|  motif   |  alien   | length | n_seqs | ratio | rat_al |   train_size   | random_state |
+|----------|----------|--------|--------|-------|--------|----------------|--------------|
+| required | required |  200   | 10000  |  0.2  |  0.2   |       0.7      |      42      |
 
 <img width="324" height="150" alt="5_eng" src="https://github.com/user-attachments/assets/a18a7275-2140-4b7d-88b4-dc90f8dbe7ac" />
 
@@ -62,9 +62,9 @@ Binary classification task that implies that the activity requires the presence 
 Binary classification task that suppose the activity only if the motifs are located at a close distance from each other. Maximum allowable distance is set as a parameter.
 
 **Settings:**
-|  motif   |  alien   | length | act_dist | n_seqs | ratio | gc_content |   train_size   | random_state |
-|----------|----------|--------|----------|--------|-------|------------|----------------|--------------|
-| required | required |  200   |    50    | 10000  |  0.2  |    0.41    |       0.7      |      42      |
+|  motif   |  alien   | length | act_dist | n_seqs | ratio |   train_size   | random_state |
+|----------|----------|--------|----------|--------|-------|----------------|--------------|
+| required | required |  200   |    50    | 10000  |  0.2  |       0.7      |      42      |
 
 <img width="457" height="104" alt="6_eng" src="https://github.com/user-attachments/assets/d755ea5d-f771-48d4-9e73-1944c5de20c0" />
 
@@ -72,9 +72,11 @@ Binary classification task that suppose the activity only if the motifs are loca
 Binary classification task that implies that the activity depends on order of first and second motifs.
 
 **Settings:**
-|  motif   |  alien   | length | n_seqs | ratio | rat_al | gc_content |   train_size   | random_state |
-|----------|----------|--------|--------|-------|--------|------------|----------------|--------------|
-| required | required |  200   | 10000  |  0.8  |  0.8   |    0.41    |       0.7      |      42      |
+|  motif   |  alien   | length | n_seqs | ratio | rat_al |   train_size   | random_state |
+|----------|----------|--------|--------|-------|--------|----------------|--------------|
+| required | required |  200   | 10000  |  0.8  |  0.8   |       0.7      |      42      |
+
+<img width="346" height="116" alt="7_eng" src="https://github.com/user-attachments/assets/780ab4b6-f4f6-4e51-a12b-4866870894ce" />
 
 ## Dataset parameters
 #### **`split: str`**, optional
@@ -99,8 +101,6 @@ The frequency of occurrence of target and alien motifs, respectively. In tasks 1
 #### **`min_num; max_num: int`**, optional, default=0; 5
 The minimum and maximum number of motifs in regression tasks, respectively.
 With min_num=0, activity tends to 0; max_num gives activity tends to 1.
-#### **`gc_content: float`**, optional, default=0.41
-The average GC-content of the background sequence. It is about 41% in human genome. In other organisms (and in specific genomic regions) this value varies.
 #### **`train_size: float`**, optional, default=0.7
 Fraction of training subset. Sizes of validation and testing sets are equal.
 #### **`random_state: int`**, optional, default=42
