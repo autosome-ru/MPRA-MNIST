@@ -47,7 +47,6 @@ class SimpleMotifDataset(MpraDataset):
         length=200,
         n_seqs=10000,
         ratio=0.2,
-        gc_content=0.41,
         train_size=0.7,
         random_state=42):
         
@@ -131,7 +130,6 @@ class LinCoopDataset(MpraDataset):
         n_seqs=10000,
         min_num=0,
         max_num=5,
-        gc_content=0.41,
         train_size=0.7,
         random_state=42):
         
@@ -200,7 +198,6 @@ class NonlinCoopDataset(MpraDataset):
         n_seqs=10000,
         min_num=0,
         max_num=5,
-        gc_content=0.41,
         train_size=0.7,
         random_state=42):
         
@@ -271,7 +268,6 @@ class AlienDataset(MpraDataset):
         n_seqs=10000,
         ratio=0.2,
         rat_al=0.2,
-        gc_content=0.41,
         train_size=0.7,
         random_state=42):
         
@@ -371,7 +367,6 @@ class CombinationDataset(MpraDataset):
         n_seqs=10000,
         ratio=0.2,
         rat_al=0.2,
-        gc_content=0.41,
         train_size=0.7,
         random_state=42):
         
@@ -472,7 +467,6 @@ class DistanceDataset(MpraDataset):
         act_dist=10,
         n_seqs=10000,
         ratio=0.2,
-        gc_content=0.41,
         train_size=0.7,
         random_state=42):
         
