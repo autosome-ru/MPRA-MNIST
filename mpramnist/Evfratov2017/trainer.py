@@ -71,21 +71,35 @@ class LitModel_Evfratov(L.LightningModule):
         self.y_score = torch.tensor([])
         self.y_true = torch.tensor([])
 
+    def forward(self, x):
+
+        return self.model(x)
+
     def setup(self, stage=None):
         self.y_score = self.y_score.to(self.device)
         self.y_true = self.y_true.to(self.device)
 
-    def training_step(self, batch, batch_nb):
-        X, y = batch
-        y_hat = self.model(X)
-        y = y.long()
+    def labels_and_predicted_unsqueeze(self, pred, targets):
+        if pred.dim() == 1:
+            pred = pred.unsqueeze(-1)  # [1076] -> [1076, 1]
+        if targets.dim() == 1:
+            targets = targets.unsqueeze(-1)  # [1076] -> [1076, 1]
+        return pred, targets
 
-        loss = self.loss(y_hat, y)
+    def training_step(self, batch, batch_nb):
+        x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.forward(x)
+        
+        loss = self.loss(y_hat, y.long())
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x)
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.forward(x)
         y = y.long()
 
         loss = self.loss(y_hat, y)
@@ -123,7 +137,9 @@ class LitModel_Evfratov(L.LightningModule):
 
     def test_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x)
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.forward(x)
         y = y.long()
 
         loss = self.loss(y_hat, y)

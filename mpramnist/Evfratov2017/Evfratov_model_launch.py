@@ -15,6 +15,8 @@ from mpramnist.models import L1KLmixed
 from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
+
+from mpramnist.models import DREAM_RNN
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -36,7 +38,7 @@ general.add_argument("--device",
                      default=0)
 general.add_argument("--num_workers",
                      type=int, 
-                     default=103)
+                     default=16)
 general.add_argument("--batch_size",
                      type=int, 
                      default=32)
@@ -86,6 +88,9 @@ else:
 # preprocessing
 train_transform = t.Compose([t.ReverseComplement(0.5),t.Seq2Tensor(),])
 test_transform = t.Compose([t.Seq2Tensor(),t.ReverseComplement(0),])
+if args.model == "Malinois":
+    train_transform = t.Compose([t.Padding(200),t.ReverseComplement(0.5),t.Seq2Tensor(),])
+    test_transform = t.Compose([t.Padding(200),t.Seq2Tensor(),t.ReverseComplement(0),])
 
 for run in list(range(args.runs)):
     res = []
@@ -115,17 +120,15 @@ for run in list(range(args.runs)):
                 pool_sizes=[2, 2, 2, 2],
                 resize_factor=4)
             model.apply(initialize_weights)
-            loss =nn.MSELoss()
         elif args.model == "MPRAnn":
             model = MPRAnn(output_dim=N_CLASSES)
-            loss =nn.MSELoss()
         elif args.model == "Malinois":
             length = len(train_dataset[0][0][0])
             model = BassetBranched(input_len=length, n_outputs=N_CLASSES)
-            loss =nn.MSELoss()
         elif args.model == "PARM":
             model = PARM(n_block=5, type_loss="mse", output_dim=N_CLASSES)
-            loss =nn.MSELoss()
+        elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+            model = DREAM_RNN(len(train_dataset[0][0]), len(train_dataset[0][0][0]), N_CLASSES)
 
         seq_model = LitModel_Evfratov(model=model,loss=nn.CrossEntropyLoss(),n_classes=N_CLASSES,weight_decay=args.wd, lr=args.lr, print_each=1)
 

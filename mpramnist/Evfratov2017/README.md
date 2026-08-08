@@ -6,7 +6,7 @@ The Evfratov dataset is based on a large-scale MPRA (Massively Parallel Reporter
 
 All sequences include the start codon AUG followed by either 20 or 30 randomized nucleotides (resulting in total lengths of 23 or 33 nt). The processed dataset contains 11,692 (for 23 nt) and 11,889 (for 33 nt) unique sequences with their assigned efficiency class. The data is pre-split into training, validation, and test sets in an 8:1:1 ratio.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/EvfratovDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Evfratov2017/EvfratovDataset_example.ipynb) for detailed usage example and training
 
 ## Tasks
 
@@ -63,17 +63,19 @@ If `None`, uses the default dataset directory from parent class.
 
 2) **Merging classes**: Setting `merge_last_classes=True` can help mitigate class imbalance by merging the two least populated classes.
 
-3) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/EvfratovDataset_example.ipynb) for detailed usage example and training
+3) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Evfratov2017/EvfratovDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    import mpramnist
-    from mpramnist.Evfratov.dataset import EvfratovDataset
-    import torch.utils.data as data
+    from mpramnist.Evfratov2017 import EvfratovDataset
+    from mpramnist.Evfratov2017 import LitModel_Evfratov
+
     import mpramnist.transforms as t
+
+    from torch.utils.data import DataLoader
 ```
 
 ### 2) Initialize transforms
@@ -104,7 +106,7 @@ If `None`, uses the default dataset directory from parent class.
     # With merged classes for balanced classification
     val_dataset = EvfratovDataset(
         split='val',
-        length_of_seq=33,
+        length_of_seq=23,
         merge_last_classes=True
     )
     # Plot histogram with 7 classes if merge_last_classes=True
@@ -122,23 +124,29 @@ If `None`, uses the default dataset directory from parent class.
     )
 ```
 
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 Evfratov_model_launch.py --model MPRALegNet --lr 1e-2 --wd 1e-1 --result_dir ./Evfratov_legnet.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#Malinois
+python3 Evfratov_model_launch.py --model Malinois --lr 1e-2 --wd 1e-1 --result_dir ./Evfratov_malinois.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#MPRAnn
+python3 Evfratov_model_launch.py --model MPRAnn --lr 1e-2 --wd 1e-1 --result_dir ./Evfratov_mprann.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#PARM
+python3 Evfratov_model_launch.py --model PARM --lr 1e-2 --wd 1e-1 --result_dir ./Evfratov_parm.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#DREAM-RNN
+python3 Evfratov_model_launch.py --model DREAM-RNN --lr 1e-2 --wd 1e-1 --result_dir ./evfratov_dream-rnn.tsv --batch_size 1024 --epoch_num 50 --runs 5
+```
+
 ## Original Benchmark Quality
 
 **F1 Score**
 
-- **23 nt** sequences (20 nt after AUG): F1 = **0.22**
-
-- **33 nt** sequences (30 nt after AUG): F1 = **0.22**
-
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-**F1 Score**
-
-- **23 nt** sequences (20 nt after AUG): F1 = **0.50**
-
-- **33 nt** sequences (30 nt after AUG): F1 = **0.41**
-
+| Cel type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| The JM109 E. coli strain | 20 nucleotides| 0,22 | 0,516 | 0,4934 | 0,4517 | 0,4767 | 0,529 |
+| The JM109 E. coli strain | 30 nucleotides | 0,22 | 0,384 | 0,2271 | 0,3547 | 0,4106 | 0,433 |
 
 ## Citation
 

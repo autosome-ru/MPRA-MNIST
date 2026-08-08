@@ -21,9 +21,18 @@ class LitModel_Rafi(L.LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    def labels_and_predicted_unsqueeze(self, pred, targets):
+        if pred.dim() == 1:
+            pred = pred.unsqueeze(-1)  # [1076] -> [1076, 1]
+        if targets.dim() == 1:
+            targets = targets.unsqueeze(-1)  # [1076] -> [1076, 1]
+        return pred, targets
+
     def training_step(self, batch, batch_nb):
         X, y = batch
         y_hat = self.forward(X)
+
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
         
         loss = self.loss(y_hat, y)
 
@@ -37,6 +46,9 @@ class LitModel_Rafi(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self.forward(x)
+
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
+
         loss = self.loss(y_hat, y)
 
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
@@ -64,6 +76,9 @@ class LitModel_Rafi(L.LightningModule):
     def test_step(self, batch, _):
         x, y = batch
         y_hat = self.forward(x)
+
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
+
         loss = self.loss(y_hat, y)
 
         self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
@@ -88,12 +103,15 @@ class LitModel_Rafi(L.LightningModule):
             ref_pred = self.model(seqs)
             alt_pred = None
 
+        ref_pred, labels = self.labels_and_predicted_unsqueeze(ref_pred, labels) # [1076] -> [1076, 1]
+
         result = {
             "ref_predicted": ref_pred.cpu().detach().float(),
             "target": labels.cpu().detach().float(),
         }
 
         if alt_pred is not None:
+            alt_pred, labels = self.labels_and_predicted_unsqueeze(alt_pred, labels) # [1076] -> [1076, 1]
             result["alt_predicted"] = alt_pred.cpu().detach().float()
 
         return result

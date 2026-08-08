@@ -2,7 +2,7 @@
 
 ## Main Information
 
-The DeepPromoter dataset is based on the experimental data from [Wang et al. 2020](https://academic.oup.com/nar/article/48/12/6403/5837049?login=false)., which includes 14,098 promoter sequences from E. coli that were experimentally validated for activity. This collection comprises:
+The DeepPromoter dataset is based on the **episomal** experimental data from [Wang et al. 2020](https://academic.oup.com/nar/article/48/12/6403/5837049?login=false)., which includes 14,098 promoter sequences from E. coli that were experimentally validated for activity. This collection comprises:
 
 - **Natural promoters** from the E. coli K12 MG1655 genome
 
@@ -12,7 +12,7 @@ Each sequence is **50 nucleotides** long and represents the region upstream of t
 
 After removing duplicates, the dataset was split into: **9,000 sequences for training, 1,000 for validation, and 1,884 for testing**.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/DeepPromoterDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Wang2020/WangDataset_example.ipynb) for detailed usage example and training
 
 ## Tasks
 
@@ -74,17 +74,19 @@ If `None`, uses the default dataset directory from parent class.
 
 ## Data Handling Considerations
 
-1) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/DeepPromoterDataset_example.ipynb) for detailed usage example and training
+1) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Wang2020/WangDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    import mpramnist
-    from mpramnist.trainers import LitModel_DeepPromoter
-    import torch.utils.data as data
+    from mpramnist.Wang2020.dataset import WangDataset
+     mpramnist.Wang2020.trainer import LitModel_Wang
+
     import mpramnist.transforms as t
+
+    from torch.utils.data import DataLoader
 ```
 
 ### 2) Initialize trannsforms
@@ -108,13 +110,13 @@ If `None`, uses the default dataset directory from parent class.
 
 ```python
     # Basic usage for training
-    dataset = DeepPromoterDataset(
+    dataset = WangDataset(
         split='train', 
         transform = train_transform,
         root="../data/"
     )
 
-    val_dataset = DeepPromoterDataset(
+    val_dataset = WangDataset(
         split="val", 
         transform=val_test_transform, 
         root="../data/"
@@ -140,17 +142,29 @@ If `None`, uses the default dataset directory from parent class.
     )
 ```
 
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 Wang_model_launch.py --model MPRALegNet --lr 1e-3 --wd 1e-4 --result_dir ./wang_legnet.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#Malinois
+python3 Wang_model_launch.py --model Malinois --lr 1e-3 --wd 1e-4 --result_dir ./wang_malinois.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#MPRAnn
+python3 Wang_model_launch.py --model MPRAnn --lr 1e-3 --wd 1e-4 --result_dir ./wang_mprann.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#PARM
+python3 Wang_model_launch.py --model PARM --lr 1e-3 --wd 1e-4 --result_dir ./wang_parm.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#DREAM-RNN
+python3 Wang_model_launch.py --model DREAM-RNN --lr 1e-3 --wd 1e-4 --result_dir ./wang_dream-rnn.tsv --batch_size 1024 --epoch_num 50 --runs 5
+```
+
 ## Original Benchmark Quality
 
 **Pearson correlation, r**
 
-- **r** = 0.25
+| Cell type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| The DH5α E. coli strain | 0,25 | 0,269 | 0,0549 | 0,1044 | 0,2584 | 0,0466 |
 
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-**Pearson correlation, r**
-
-- **r** = 0.25
 
 ## Citation
 

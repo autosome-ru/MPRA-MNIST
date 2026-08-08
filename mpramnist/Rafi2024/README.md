@@ -2,7 +2,7 @@
 
 ## Main Information
 
-The Dream dataset is based on the Random Promoter DREAM Challenge, where participants designed sequence-to-expression models trained on expression measurements of `promoters with random DNA sequences` ([Rafi et al. 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10888977/)). The training data comprises `~6.7 million unique 80-bp random promoter sequences` tested in Saccharomyces cerevisiae. The input is a DNA sequence, and the output is a scalar `gene expression value` predicted from the sequence.
+The Dream dataset is based on the **episomal** Random Promoter DREAM Challenge, where participants designed sequence-to-expression models trained on expression measurements of `promoters with random DNA sequences` ([Rafi et al. 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10888977/)). The training data comprises `~6.7 million unique 80-bp random promoter sequences` tested in Saccharomyces cerevisiae. The input is a DNA sequence, and the output is a scalar `gene expression value` predicted from the sequence.
 
 - The `training data` consists of random DNA sequences (as described in original studies).
 
@@ -12,7 +12,7 @@ The Dream dataset is based on the Random Promoter DREAM Challenge, where partici
 
 For neural network processing, sequences should be standardized to a fixed length. We recommend using constant flanking sequences from the original experimental system. Validation uses the public competition set, while testing uses the private held-out set.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/DreamDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/tree/main/mpramnist/Rafi2024) for detailed usage example and training
 
 ## Tasks
 
@@ -100,17 +100,19 @@ Root directory for data storage. If `None`, uses default data directory.
 
 5) Using the `transform` argument is recommended to apply necessary preprocessing, such as adding constant flanking sequences and converting sequences to tensors.
 
-6) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/DreamDataset_example.ipynb) for detailed usage example and training
+6) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/tree/main/mpramnist/Rafi2024) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    from mpramnist.Dream.dataset import DreamDataset
+    from mpramnist.Rafi2024 import RafiDataset
+    from mpramnist.Rafi2024 import LitModel_Rafi
+
     import mpramnist.transforms as t
-    import mpramnist.target_transforms as t_t
-    import torch.utils.data as data
+
+    from torch.utils.data import DataLoader
 
     length = 120
     plasmid = DreamDataset.PLASMID.upper()
@@ -147,29 +149,29 @@ Root directory for data storage. If `None`, uses default data directory.
 
 ```python
     # Load training data (all sequences)
-    train_dataset = DreamDataset(split="train", transform=train_transform)
+    train_dataset = RafiDataset(split="train", transform=train_transform)
 
     # Load validation data for high-activity sequences
-    val_dataset = DreamDataset(split="val", data_type="high", transform=val_test_transform)
+    val_dataset = RafiDataset(split="val", data_type="high", transform=val_test_transform)
 
     # Load test data for SNV analysis
-    test_dataset = DreamDataset(split="test", data_type="snv", transform=val_test_transform)
+    test_dataset = RafiDataset(split="test", data_type="snv", transform=val_test_transform)
 
     # Load multiple dataset types for validation
-    multi_dataset = DreamDataset(split="val", data_type=["high", "yeast"], transform=val_test_transform)
+    multi_dataset = RafiDataset(split="val", data_type=["high", "yeast"], transform=val_test_transform)
 ```
 
 ### 4) Dataloader Creation
 
 ```python 
-    train_loader = data.DataLoader(
+    train_loader = DataLoader(
         dataset=train_dataset, 
         batch_size=1024, 
         shuffle=True, # True for training, False for val and test
         num_workers=8
     )
 
-    val_loader = data.DataLoader(
+    val_loader = DataLoader(
         dataset=val_dataset, 
         batch_size=1024, 
         shuffle=False, # Do not shuffle for validation and testing
@@ -177,50 +179,39 @@ Root directory for data storage. If `None`, uses default data directory.
     )
 ```
 
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 Rafi_model_launch.py --model MPRALegNet --epoch_num 5 --runs 5 --result_dir ./rafi_legnet.tsv lr 1e-0.5 --wd 0.001
+#Malinois
+python3 Rafi_model_launch.py --model Malinois --epoch_num 30 --runs 5 --result_dir ./rafi_malinois.tsv
+#MPRAnn
+python3 Rafi_model_launch.py --model MPRAnn --epoch_num 30 --runs 5 --result_dir ./rafi_mprann.tsv
+#PARM
+python3 Rafi_model_launch.py --model PARM --epoch_num 30 --runs 5 --result_dir ./rafi_parm.tsv
+#DREAM-RNN
+python3 Rafi_model_launch.py --model DREAM-RNN --epoch_num 30 --runs 5 --result_dir ./rafi_dream_rnn.tsv
+```
+
 ## Original Benchmark Quality
 
-**Coefficient of Determination (R²)**
+## Achieved Performance Using Basic Models
 
-- For **All Sequences** R² = 0.95
+Pearson correlation, r^2
 
-- For **High** expression sequences R² = 0.51
+| Cell type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| AGS | All Sequences | 0,95 | 0,928 | 0,8521 | 0,7649 | 0,7741 | 0,95 |
+| HAP1 | High | 0,51 | 0,285 | 0,0768 | 0,0378 | 0,0477 | 0,51 |
+| HepG2 | Low | 0,51 | 0,152 | 0,2553 | 0,1109 | 0,1279 | 0,51 |
+| K562 | Native | 0,78 | 0,745 | 0,6274 | 0,4144 | 0,407 | 0,78 |
+| MCF7 | Random | 0,96 | 0,951 | 0,9238 | 0,8391 | 0,859 | 0,96 |
+| U2OS | Challenging | 0,94 | 0,909 | 0,7252 | 0,6494 | 0,7033 | 0,94 |
+| HCT116 | SNVs | 0,73 | 0,688 | 0,5297 | 0,3366 | 0,3487 | 0,73 |
+| HEK293 | Motif Perturbation | 0,96 | 0,945 | 0,8683 | 0,7209 | 0,7838 | 0,96 |
+| LNCaP | Motif Tiling | 0,91 | 0,855 | 0,6644| 0,5916 | 0,5131 | 0,91 |
 
-- For **Low** expression sequences R² = 0.51
-
-- For **Native** or **Yeast** sequences R² = 0.78
-
-- For **Random** sequences R² = 0.96
-
-- For **Challenging** sequences R² = 0.94
-
-- For **SNV's** sequences R² = 0.73
-
-- For **Motif Perturbation** sequences R² = 0.96
-
-- For **Motif Tiling** sequences R² = 0.91
-
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-**Coefficient of Determination (R²)**
-
-- For **All Sequences** R² = 0.933
-
-- For **High** expression sequences R² = 0.351
-
-- For **Low** expression sequences R² = 0.287
-
-- For **Native** or **Yeast** sequences R² = 0.745
-
-- For **Random** sequences R² = 0.954
-
-- For **Challenging** sequences R² = 0.92
-
-- For **SNV's** sequences R² = 0.69
-
-- For **Motif Perturbation** sequences R² = 0.95
-
-- For **Motif Tiling** sequences R² = 0.88
  
 
 ## Citation

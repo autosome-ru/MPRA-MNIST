@@ -22,10 +22,22 @@ class LitModel_Kircher(L.LightningModule):
 
     def forward(self, x):
         return self.model(x)
+    
+    def labels_and_predicted_unsqueeze(self, pred, targets):
+        if pred.dim() == 1:
+            pred = pred.unsqueeze(-1)  # [1076] -> [1076, 1]
+        if targets.dim() == 1:
+            targets = targets.unsqueeze(-1)  # [1076] -> [1076, 1]
+        return pred, targets
 
     def training_step(self, batch, batch_nb):
-        X, y = batch
-        y_hat = self.forward(X)
+        x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
+        y_hat = self.forward(x)
+                  
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
+        
         loss = self.loss(y_hat, y)
 
         self.log(
@@ -37,7 +49,12 @@ class LitModel_Kircher(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
+                  
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
+        
         loss = self.loss(y_hat, y)
 
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
@@ -64,7 +81,12 @@ class LitModel_Kircher(L.LightningModule):
 
     def test_step(self, batch, _):
         x, y = batch
+        if x.ndim == 3 and x.shape[2] < x.shape[1]:
+            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
+                  
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
+        
         loss = self.loss(y_hat, y)
 
         self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)

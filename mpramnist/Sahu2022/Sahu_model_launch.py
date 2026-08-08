@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 from mpramnist.Sahu2022 import SahuDataset
-from mpramnist.Sahu2022 import LitModel_Sahu, LitModel_Sahu_binary_legnet, LitModel_Sahu_binary_mprann,LitModel_Sahu_binary_malinois, LitModel_Sahu_binary_parm
+from mpramnist.Sahu2022 import LitModel_Sahu, LitModel_Sahu_binary_legnet, LitModel_Sahu_binary_mprann,LitModel_Sahu_binary_malinois, LitModel_Sahu_binary_parm, LitModel_Sahu_binary_dream_rnn
 
 from mpramnist.models import HumanLegNet
 from mpramnist.models import initialize_weights
@@ -15,6 +15,9 @@ from mpramnist.models import L1KLmixed
 from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
+
+from mpramnist.models import DREAM_RNN
+from mpramnist.models.DREAM_RNN import AutosomeFinalLayersBlock, BHICoreBlock, BHIFirstLayersBlock, PrixFixeNet
 
 import mpramnist.transforms as t
 
@@ -38,7 +41,7 @@ general.add_argument("--device",
                      default=0)
 general.add_argument("--num_workers",
                      type=int, 
-                     default=103)
+                     default=8)
 general.add_argument("--batch_size",
                      type=int, 
                      default=1024)
@@ -97,7 +100,7 @@ for run in list(range(args.runs)):
         train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
         val_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
         test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
-        if args.model == "MPRALegNet" and task != "binary":
+        if args.model == "MPRALegNet" and task.lower() != "binary":
             model = HumanLegNet(
                 in_ch=4,
                 output_dim=1,
@@ -110,20 +113,25 @@ for run in list(range(args.runs)):
             model.apply(initialize_weights)
             loss =torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "MPRAnn" and task != "binary":
+        elif args.model == "MPRAnn" and task.lower() != "binary":
             model = MPRAnn(output_dim=1)
             loss = torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "Malinois" and task != "binary":
+        elif args.model == "Malinois" and task.lower() != "binary":
             length = len(train_dataset[0][0][0])
             model = BassetBranched(input_len=length, n_outputs=1)
             loss = torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "PARM" and task != "binary":
+        elif args.model == "PARM" and task.lower() != "binary":
             model = PARM(n_block=5, type_loss="mse", output_dim=1)
             loss = torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "MPRALegNet" and task == "binary":
+        elif args.model == "DREAM-RNN" or args.model == "DREAM_RNN" and task.lower() != "binary":
+            length = len(train_dataset[0][0][0])
+            model = DREAM_RNN(4, length, 1)
+            loss = torch.nn.BCEWithLogitsLoss()
+            seq_model = LitModel_Sahu(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
+        elif args.model == "MPRALegNet" and task.lower() == "binary":
             class HumanLegNetBinary(HumanLegNet):
                 def __init__(
                     self,
@@ -154,7 +162,7 @@ for run in list(range(args.runs)):
             model.apply(initialize_weights)
             loss =torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu_binary_legnet(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "MPRAnn" and task == "binary":
+        elif args.model == "MPRAnn" and task.lower() == "binary":
             class MPRAnnBinary(MPRAnn):
                 def __init__(
                     self,
@@ -191,7 +199,7 @@ for run in list(range(args.runs)):
             model = MPRAnnBinary()
             loss = torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu_binary_mprann(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "Malinois" and task == "binary":
+        elif args.model == "Malinois" and task.lower() == "binary":
             length = len(train_dataset[0][0]["seq"][0])
             class MalinoisBinary(BassetBranched):
                 def __init__(
@@ -232,7 +240,7 @@ for run in list(range(args.runs)):
             model = MalinoisBinary(input_len=length, n_outputs=1)
             loss = torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu_binary_malinois(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
-        elif args.model == "PARM" and task == "binary":
+        elif args.model == "PARM" and task.lower() == "binary":
             class PARMBinary(PARM):
 
                 def __init__(self, n_block, type_loss, output_dim):
@@ -255,6 +263,56 @@ for run in list(range(args.runs)):
             model = PARMBinary(n_block=5, type_loss="mse", output_dim=1)
             loss = torch.nn.BCEWithLogitsLoss()
             seq_model = LitModel_Sahu_binary_parm(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
+        elif args.model == "DREAM-RNN" or args.model == "DREAM_RNN" and task.lower() == "binary":
+            class AutosomeFinalLayersBlockBinary(AutosomeFinalLayersBlock):
+                def forward(self, x):
+                    x = self.mapper(x)
+                    x = F.adaptive_avg_pool1d(x, 1)
+                    x = x.squeeze(2)
+                    return x
+            def DREAM_RNN_Binary(in_channels, seqsize):
+                first = BHIFirstLayersBlock(
+                    in_channels=in_channels,
+                    out_channels=320,
+                    seqsize=seqsize,
+                    kernel_sizes=[9, 15],
+                    pool_size=1,
+                    dropout=0.2
+                )
+
+                core = BHICoreBlock(
+                    in_channels=first.out_channels,
+                    out_channels=320,
+                    seqsize=first.infer_outseqsize(),
+                    lstm_hidden_channels=320,
+                    kernel_sizes=[9, 15],
+                    pool_size=1,
+                    dropout1=0.2,
+                    dropout2=0.5
+                )
+
+                # out_channels здесь не используется (linear отброшен),
+                # но параметр нужен конструктору AutosomeFinalLayersBlock
+                final = AutosomeFinalLayersBlockBinary(
+                    in_channels=core.out_channels,
+                    seqsize=core.infer_outseqsize(),
+                    out_channels=1
+                )
+
+                generator = torch.Generator()
+
+                model = PrixFixeNet(
+                    first=first,
+                    core=core,
+                    final=final,
+                    generator=generator
+                )
+                return model
+                
+            length = len(train_dataset[0][0]["seq"][0])
+            model = DREAM_RNN_Binary(in_channels=4, seqsize=length)
+            loss = torch.nn.BCEWithLogitsLoss()
+            seq_model = LitModel_Sahu_binary_dream_rnn(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
 
         checkpoint_callback = ModelCheckpoint(monitor="val_aupr", mode="max", save_top_k=1, save_last=False)
 
@@ -274,7 +332,7 @@ for run in list(range(args.runs)):
         trainer.fit(seq_model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
         best_model_path = checkpoint_callback.best_model_path
-        if task != "binary":
+        if task.lower() != "binary":
             seq_model = LitModel_Sahu.load_from_checkpoint(best_model_path,model=model, loss=torch.nn.BCEWithLogitsLoss(), weight_decay=args.wd, lr=args.lr, print_each=1)
         else:
             if args.model == "MPRALegNet":
@@ -285,6 +343,8 @@ for run in list(range(args.runs)):
                 seq_model = LitModel_Sahu_binary_malinois.load_from_checkpoint(best_model_path, model=model, loss=torch.nn.BCEWithLogitsLoss(), weight_decay=args.wd, lr=args.lr, print_each=1)
             elif args.model == "PARM":
                 seq_model = LitModel_Sahu_binary_parm.load_from_checkpoint(best_model_path, model=model, loss=torch.nn.BCEWithLogitsLoss(), weight_decay=args.wd, lr=args.lr, print_each=1)
+            elif args.model == "DREAM-RNN" or args.model == "DREAM_RNN":
+                seq_model = LitModel_Sahu_binary_dream_rnn.load_from_checkpoint(best_model_path, model=model, loss=torch.nn.BCEWithLogitsLoss(), weight_decay=args.wd, lr=args.lr, print_each=1)
 
         result = trainer.test(seq_model, dataloaders=test_loader)
         res.append(result[0]["test_aupr"])

@@ -16,6 +16,7 @@ from mpramnist.models import MPRAnn
 
 from mpramnist.models import PARM
 
+from mpramnist.models import DREAM_RNN
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -38,7 +39,7 @@ general.add_argument("--device",
                      default=0)
 general.add_argument("--num_workers",
                      type=int, 
-                     default=103)
+                     default=16)
 general.add_argument("--batch_size",
                      type=int, 
                      default=1024)
@@ -71,7 +72,7 @@ trainer_args.add_argument("--wd",
                      default=1e-2)
 trainer_args.add_argument("--epoch_num",
                             type=int,
-                            default=50)
+                            default=5)
 
 args = parser.parse_args()
 
@@ -156,6 +157,10 @@ for run in list(range(args.runs)):
         elif args.model == "PARM":
             model = PARM(n_block=5, type_loss="mse", output_dim=1)
             loss = nn.MSELoss()
+        elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+            length = len(train_dataset[0][0][0])
+            model = DREAM_RNN(in_channels=len(train_dataset[0][0]), seqsize=length, out_channels=1)
+            loss = nn.MSELoss()
 
         seq_model = LitModel_Vaishnav(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1)
         checkpoint_callback = ModelCheckpoint(monitor="val_pearson", mode="max", save_top_k=1, save_last=False)
@@ -180,13 +185,14 @@ for run in list(range(args.runs)):
 
         for type in ["native","drift","paired"]:
 
+            paired = True if type=="paired" else False
             test_forw = VaishnavDataset(split="test", dataset_env_type=env, test_dataset_type=type, transform=forw_transform,root=args.root,)
             test_rev = VaishnavDataset(split="test", dataset_env_type=env, test_dataset_type=type, transform=rev_transform,root=args.root,)
 
             forw = DataLoader(dataset=test_forw,batch_size=args.batch_size,shuffle=False,num_workers=args.num_workers,pin_memory=True,)
             rev = DataLoader(dataset=test_rev,batch_size=args.batch_size,shuffle=False,num_workers=args.num_workers,pin_memory=True,)
 
-            r = meaned_prediction(forw, rev, trainer, seq_model, type).numpy()
+            r = meaned_prediction(forw, rev, trainer, seq_model, type, paired).numpy()
             r_array.append(r)
             print(r)
     

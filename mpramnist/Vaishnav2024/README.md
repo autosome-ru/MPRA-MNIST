@@ -2,7 +2,7 @@
 
 ## Main Information
 
-The Vaishnav dataset is based on the research by [Vaishnav et al., 2022](https://www.nature.com/articles/s41586-022-04506-6). It contains measurements of promoter-driven gene expression (acting as a proxy for regulatory activity) in two environments: a standard rich medium (YPD, containing yeast extract, peptone, and glucose) and a minimal defined medium (SD-Ura, a synthetic medium lacking uracil).
+The Vaishnav dataset is based on the research by [Vaishnav et al., 2022](https://www.nature.com/articles/s41586-022-04506-6). It contains measurements of **episomal** promoter-driven gene expression (acting as a proxy for regulatory activity) in two environments: a standard rich medium (YPD, containing yeast extract, peptone, and glucose) and a minimal defined medium (SD-Ura, a synthetic medium lacking uracil).
 
 The core dataset comprises approximately **40 million unique DNA promoter sequences**, each measured in one or both environments, resulting in **30,722,376 sequence-environment pairs for YPD** and **20,616,659 pairs for SD-Ura**.
 
@@ -16,7 +16,7 @@ The training data (random sequences) is split into training and validation sets 
 2.  **Drift sequences:** Algorithmically generated sequences from the evolution experiment.
 3.  **Paired sequences:** Reference and mutated sequence pairs to predict the effect of single mutations.
 
-See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/VaishnavDataset_example.ipynb) for detailed usage example and training
+See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Vaishnav2024/VaishnavDataset_example.ipynb) for detailed usage example and training
 
 ## Tasks
 
@@ -88,17 +88,19 @@ Root directory for data storage. If `None`, uses default data directory.
 
 4) Using the `transform` argument is recommended to apply necessary preprocessing, such as adding constant flanking sequences and converting sequences to tensors.
 
-5) **Example Usage**: See [Usage Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/VaishnavDataset_example.ipynb) for detailed usage example and training
+5) **Example Usage**: See [Usage Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Vaishnav2024/VaishnavDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
 ### 1) Import Important Packages
 
 ```python
-    from mpramnist.Vaishnav.dataset import VaishnavDataset
+    from mpramnist.Vaishnav2024 import VaishnavDataset
+    from mpramnist.Vaishnav2024 import LitModel_Vaishnav
+    
     import mpramnist.transforms as t
-    import mpramnist.target_transforms as t_t
-    import torch.utils.data as data
+    
+    from torch.utils.data import DataLoader
 
     length = 110
     plasmid = VaishnavDataset.PLASMID.upper()
@@ -181,27 +183,35 @@ Root directory for data storage. If `None`, uses default data directory.
     )
 ```
 
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 Vaishnav_model_launch.py --model MPRALegNet --lr 1e-2 --wd 1e-2 --result_dir ./Vaishnav_legnet.tsv --batch_size 1024 --epoch_num 1
+#Malinois
+python3 Vaishnav_model_launch.py --model Malinois --lr 1e-2 --wd 1e-2 --result_dir ./Vaishnav_malinois.tsv --batch_size 1024 --epoch_num 1
+#MPRAnn
+python3 Vaishnav_model_launch.py --model MPRAnn --lr 1e-2 --wd 1e-2 --result_dir ./Vaishnav_mprann.tsv --batch_size 1024 --epoch_num 1
+#PARM
+python3 Vaishnav_model_launch.py --model PARM --lr 1e-2 --wd 1e-2 --result_dir ./Vaishnav_parm.tsv --batch_size 1024 --epoch_num 1
+#DREAM-RNN
+python3 Vaishnav_model_launch.py --model DREAM-RNN --lr 1e-2 --wd 1e-2 --result_dir ./Vaishnav_dream-rnn.tsv --batch_size 1024 --epoch_num 1
+```
+
+
 ## Original Benchmark Quality
 
 Pearson correlation, r
 
-- **YPD (complex) Native** sequenses : r = 0,958
-- **YPD (complex) Drift** sequenses : r = 0,98 
-- **YPD (complex) Paired** sequenses : r = 0,869
-- **SD-Ura (defined) Native** sequenses : r = 0,931
-- **SD-Ura (defined) Drift** sequenses : r = 0,968
-- **SD-Ura (defined) Paired** sequenses : r = 0,847
-
-## Achieved Quality Using LegNet Model in MPRA-MNIST
-
-Pearson correlation, r
-
-- **YPD (complex) Native** sequenses : r = 0,97
-- **YPD (complex) Drift** sequenses : r = 0,98 
-- **YPD (complex) Paired** sequenses : r = 0,87
-- **SD-Ura (defined) Native** sequenses : r = 0,97
-- **SD-Ura (defined) Drift** sequenses : r = 0,98
-- **SD-Ura (defined) Paired** sequenses : r = 0,85
+| Cell type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Native | 0,931 | 0,979 | 0,9697 | 0,9711 | 0,964 | 0.9643 |
+| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Drift | 0,968 | 0,986 | 0,984 | 0,9736 | 0,9734 | 0.9779 |
+| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Paired | 0,847 | 0,853 | 0,8507 | 0,831 | 0,8338 | 0.8421 |
+| strains Y8205, S288C::ura3, etc | YPD (complex) Native | 0,948 | 0,975 | 0,9672 | 0,9686 | 0,9587 | 0.9628 |
+| strains Y8205, S288C::ura3, etc | YPD (complex) Drift | 0,98 | 0,985 | 0,9856 | 0,9752 | 0,9745 | 0.9801 |
+| strains Y8205, S288C::ura3, etc | YPD (complex) Paired | 0,869 | 0,879 | 0,8793 | 0,8566 | 0,86 | 0.8674 |
+ 
 
 ## Citation
 

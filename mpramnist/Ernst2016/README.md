@@ -63,7 +63,7 @@ The 12 target columns are:
 
 ```
 
-See [Sharpr Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/SharprDataset_example.ipynb) for detailed information.
+See [Sharpr Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Ernst2016/ErnstDataset_example.ipynb) for detailed information.
 
 ## Parameters
 
@@ -113,7 +113,7 @@ Root directory where data is stored. If `None`, uses default data path.
 
 2) **Genomic Coordinates**: Use the `genomic_regions` and `exclude_regions` parameters to select or exclude specific genomic regions across chromosomes in the dataset. *Uses 0-based indexing for genomic coordinates.*
 
-3) **Example Usage**: See [Sharpr Example](https://github.com/autosome-imtf/MPRA-MNIST/blob/main/examples/SharprDataset_example.ipynb) for detailed usage example and training
+3) **Example Usage**: See [Sharpr Example](https://github.com/autosome-ru/MPRA-MNIST/blob/main/mpramnist/Ernst2016/ErnstDataset_example.ipynb) for detailed usage example and training
 
 ## Examples
 
@@ -122,8 +122,12 @@ Root directory where data is stored. If `None`, uses default data path.
 ```python
     import torch
     import mpramnist
-    from mpramnist.Sharpr.dataset import SharprDataset
-    import torch.utils.data as data
+    from mpramnist.Ernst2016 import ErnstDataset
+    from mpramnist.Ernst2016 import LitModel_Ernst
+
+    import mpramnist.transforms as t
+
+    from torch.utils.data import DataLoader
 
     print(SharprDataset.CELL_TYPES)
 
@@ -155,25 +159,25 @@ Root directory where data is stored. If `None`, uses default data path.
 ### 3) Dataset Creation
 
 ```python
-    train_dataset = SharprDataset(
+    train_dataset = ErnstDataset(
         split="train",
-        cell_type=SharprDataset.CELL_TYPES,
+        cell_type=ErnstDataset.CELL_TYPES,
         transform = transform
     )   
 
     # Load regression data with genomic region filtering
-    test_dataset = SharprDataset(
+    test_dataset = ErnstDataset(
         split="test",
-        cell_type = SharprDataset.CELL_TYPES,
+        cell_type = ErnstDataset.CELL_TYPES,
         genomic_regions="promoters.bed",
         transform = transform
     )
 
     # Load data excluding specific genomic regions
     regions = [{"chrom": "chr1", "start": 1000000, "end": 2000000}]
-    dataset = SharprDataset(
+    dataset = ErnstDataset(
         split="val",
-        cell_type = SharprDataset.CELL_TYPES,
+        cell_type = ErnstDataset.CELL_TYPES,
         genomic_regions=regions,
         exclude_regions=True,
         transform = transform
@@ -193,15 +197,36 @@ Root directory where data is stored. If `None`, uses default data path.
     )
 ```
 
+## Launch Parameters
+
+```bash
+#MPRALegNet
+python3 Ernst_model_launch.py --model MPRALegNet --lr 1e-2 --wd 1e-1 --result_dir ./ernst_legnet.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#Malinois
+python3 Ernst_model_launch.py --model Malinois --lr 1e-2 --wd 1e-1 --result_dir ./ernst_malinois.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#MPRAnn
+python3 Ernst_model_launch.py --model MPRAnn --lr 1e-2 --wd 1e-1 --result_dir ./ernst_mprann.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#PARM
+python3 Ernst_model_launch.py --model PARM --lr 1e-2 --wd 1e-1 --result_dir ./ernst_parm.tsv --batch_size 1024 --epoch_num 50 --runs 5
+#DREAM-RNN
+python3 Ernst_model_launch.py --model DREAM-RNN --lr 1e-2 --wd 1e-1 --result_dir ./ernst_dream-rnn_еуые.tsv --batch_size 1024 --epoch_num 1 --runs 5
+```
+
 ## Original Benchmark Quality
 
 No other study has used this data for pretraining, so we don't have information about the quality metrics achieved by the original authors.
 
-## Achieved Quality Using LegNet Model
+## Achieved Performance Using Basic Models
 
-| K562 average Regression | HepG2 average Regression |
-|:---------------:|:----------------:|
-| 0.408 | 0.354 |
+Pearson correlation, r
+
+| Cel type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| HepG2 | minP_avg| #N/A | 0,3336 | 0,2689 | 0.3587 | 0.3897 | 0.3704 |
+| HepG2 | sv40_avg| #N/A | 0,3158 | 0,3053 | 0.1907 | 0.2183 | 0.2135 |
+| K562 | minP_avg| #N/A | 0,3874 | 0,3124 | 0.2811 | 0.3208 | 0.3197 |
+| K562 | sv40_avg| #N/A | 0,2062 | 0,1728 | 0.2953 | 0.3445 | 0.3462 |
+
 
 ## Citation
 

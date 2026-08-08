@@ -18,6 +18,8 @@ from mpramnist.models import PARM
 
 from mpramnist.models import DeepStarr
 
+from mpramnist.models import DREAM_RNN
+
 import mpramnist.transforms as t
 
 from torch.utils.data import DataLoader
@@ -124,6 +126,10 @@ for run in list(range(args.runs)):
     elif args.model == "DeepStarr":
         model = DeepStarr(len(args.promoter_types))
         loss = nn.MSELoss()
+    elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
+            length = len(train_dataset[0][0][0])
+            model = DREAM_RNN(in_channels=len(train_dataset[0][0]), seqsize=length, out_channels=len(args.promoter_types))
+            loss = nn.MSELoss()
 
     seq_model = LitModel_deAlmeida(model=model, loss=loss, weight_decay=args.wd, lr=args.lr, cell_types=args.promoter_types, print_each=1)
     checkpoint_callback = ModelCheckpoint(monitor="val_pearson", mode="max", save_top_k=1, save_last=False)
