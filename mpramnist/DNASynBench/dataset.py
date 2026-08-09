@@ -482,10 +482,10 @@ class DistanceDataset(MpraDataset):
             for i in range(n_near):
                 while True:
                     seq = pos_model.generate(length)
-                    dist = pos_model.generate(randint(0, act_dist))
+                    dist = pos_model.generate(randint(0, act_dist+1))
                     insert = randint(0, length - len(motif) - len(alien) - len(dist))
                     seq = seq[:insert] + motif + dist + alien + seq[insert+len(motif)+len(alien)+len(dist):]
-                    if len(dist) <= act_dist:
+                    if len(dist) <= act_dist and seq.count(motif) == 1 and seq.count(alien) == 1:
                         seqs.append((seq, 1))
                         pbar.update(1)
                         break
@@ -495,7 +495,7 @@ class DistanceDataset(MpraDataset):
                     dist = pos_model.generate(randint(act_dist+1, act_dist*3))
                     insert = randint(0, length - len(motif) - len(alien) - len(dist))
                     seq = seq[:insert] + motif + dist + alien + seq[insert+len(motif)+len(alien)+len(dist):]
-                    if len(dist) >= act_dist:
+                    if len(dist) >= act_dist and seq.count(motif) == 1 and seq.count(alien) == 1:
                         seqs.append((seq, 0))
                         pbar.update(1)
                         break
