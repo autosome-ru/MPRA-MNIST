@@ -69,7 +69,7 @@ python3 Fromel_model_launch.py --model MPRAnn --lr 0.005 --wd 2e-1 --result_dir 
 python3 Fromel_model_launch.py --model PARM --lr 0.005 --wd 2e-1 --result_dir ./fromel_parm.tsv --batch_size 1024 --epoch_num 50 --runs 5 --cell_types HSPC
 python3 Fromel_model_launch.py --model PARM --lr 0.005 --wd 2e-1 --result_dir ./fromel_parm.tsv --batch_size 1024 --epoch_num 50 --runs 5 --cell_types K562
 #DREAM-RNN
-python3 Fromel_model_launch.py --model DREAM-RNN --lr 0.05 --wd 2e-1 --result_dir ./fromel_dream-rnn_0.05_0.2.tsv --batch_size 1024 --epoch_num 50 --runs 5 --cell_types HSPC
+python3 Fromel_model_launch.py --model DREAM-RNN --lr 0.0005 --wd 2e-2 --result_dir ./fromel_dream-rnn.tsv --batch_size 1024 --epoch_num 50 --runs 5 --cell_types HSPC
 python3 Fromel_model_launch.py --model DREAM-RNN --lr 0.005 --wd 2e-1 --result_dir ./fromel_dream-rnn.tsv --batch_size 1024 --epoch_num 50 --runs 5 --cell_types K562
 ```
 

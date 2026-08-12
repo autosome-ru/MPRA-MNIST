@@ -1,6 +1,8 @@
-from torch.utils.data import DataLoader
-from mpramnist.trainers import LitModel
+import torch
+import torch.nn as nn
 import lightning.pytorch as L
+from lightning.pytorch.callbacks import EarlyStopping
+from torchmetrics import PearsonCorrCoef
 
 import torch
 import torch.nn as nn
@@ -64,13 +66,15 @@ class MaskedPearsonCorrCoef(Metric):
             return corr.squeeze(0)
         return corr
 
-
-class LitModel_Fromel(LitModel):
+class LitModel_Fromel(L.LightningModule):
     def __init__(
         self,
-        weight_decay,
-        lr,
-        activity_columns=[
+        model,
+        loss=None,
+        print_each: int = 1,
+        weight_decay: float = 1e-2,
+        lr: float = 3e-4,
+        activity_columns: list[str] = [
             "State_1M",
             "State_2D",
             "State_3E",
@@ -79,135 +83,175 @@ class LitModel_Fromel(LitModel):
             "State_6N",
             "State_7M",
         ],
-        model=None,
-        loss=None,
-        print_each=1,
+        lr_sheduler_to_use = "one_cycle", # or reducelronplateau
+        # Early stopping
+        early_stopping_patience: int = 10,
+        early_stopping_metric: str = "val_loss",
+        early_stopping_mode: str = "min",
+        # LR scheduling
+        learning_rate_reduce: bool = True,
+        learning_rate_reduce_patience: int = 5,
+        learning_rate_reduce_metric: str = "val_loss",
+        learning_rate_reduce_mode: str = "min",
     ):
+        super().__init__()
+
         if loss is None:
             loss = MaskedMSE()
 
-        super().__init__(model, loss, print_each, weight_decay, lr)
+        self.model = model
+        self.loss = loss
+        self.print_each = print_each
+        self.weight_decay = weight_decay
+        self.lr = lr
+        self.lr_sheduler_to_use = lr_sheduler_to_use
+
+        # Early stopping config — consumed by configure_callbacks()
+        self.early_stopping_patience = early_stopping_patience
+        self.early_stopping_metric = early_stopping_metric
+        self.early_stopping_mode = early_stopping_mode
+
+        # ReduceLROnPlateau config — consumed by configure_optimizers()
+        self.learning_rate_reduce = learning_rate_reduce
+        self.learning_rate_reduce_patience = learning_rate_reduce_patience
+        self.learning_rate_reduce_metric = learning_rate_reduce_metric
+        self.learning_rate_reduce_mode = learning_rate_reduce_mode
+
+        if isinstance(activity_columns, str):
+            activity_columns = [activity_columns]
 
         self.activity_columns = activity_columns
-        self.num_outputs = len(self.activity_columns)
+        self.num_outputs = len(activity_columns)
 
-        self.train_pearson = MaskedPearsonCorrCoef(num_outputs=self.num_outputs)
-        self.val_pearson = MaskedPearsonCorrCoef(num_outputs=self.num_outputs)
-        self.test_pearson = MaskedPearsonCorrCoef(num_outputs=self.num_outputs)
+        self.train_pearson = PearsonCorrCoef(num_outputs=self.num_outputs)
+        self.val_pearson = PearsonCorrCoef(num_outputs=self.num_outputs)
+        self.test_pearson = PearsonCorrCoef(num_outputs=self.num_outputs)
+
+    # ------------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------------
+
+    def configure_callbacks(self):
+        return [
+            EarlyStopping(
+                monitor=self.early_stopping_metric,
+                patience=self.early_stopping_patience,
+                mode=self.early_stopping_mode,
+                verbose=True,
+            )
+        ]
+    
+    # ------------------------------------------------------------------
 
     def forward(self, x):
         return self.model(x)
 
-    def _ensure_2d(self, y_hat, y):
-        if y_hat.dim() == 1:
-            y_hat = y_hat.unsqueeze(-1)
-        if y.dim() == 1:
-            y = y.unsqueeze(-1)
-        return y_hat, y
+    def labels_and_predicted_unsqueeze(self, pred, targets):
+        if pred.dim() == 1:
+            pred = pred.unsqueeze(-1)       # [N] -> [N, 1]
+        if targets.dim() == 1:
+            targets = targets.unsqueeze(-1) # [N] -> [N, 1]
+        return pred, targets
 
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
-        y_hat = self.forward(x)
-        y_hat, y = self._ensure_2d(y_hat, y)
+    # ------------------------------------------------------------------
+    # Optimiser + scheduler
+    # ------------------------------------------------------------------
 
-        loss = self.loss(y_hat, y)
-        self.log(
-            "train_loss",
-            loss,
-            prog_bar=True,
-            on_step=True,
-            on_epoch=True,
-            logger=True,
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
 
+        if not self.learning_rate_reduce:
+            return optimizer
+
+        if self.lr_sheduler_to_use == "one_cycle":
+            lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=self.lr,
+                three_phase=False,
+                total_steps=self.trainer.estimated_stepping_batches,
+                pct_start=0.3,
+                cycle_momentum=False,
+            )
+            lr_scheduler_config = {
+                "scheduler": lr_scheduler,
+                "interval": "step",
+                "frequency": 1,
+                "name": "cycle_lr",
+            }
+        elif self.lr_sheduler_to_use == "reducelronplateau":
+            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode=self.learning_rate_reduce_mode,
+                patience=self.learning_rate_reduce_patience,
+            )
+            lr_scheduler_config = {
+                "scheduler": lr_scheduler,
+                "monitor": self.learning_rate_reduce_metric,
+                "interval": "epoch",
+                "frequency": 1,
+                "name": "reduce_lr_on_plateau",
+            }
+
+        return [optimizer], [lr_scheduler_config]
+
+    # ------------------------------------------------------------------
+    # Steps
+    # ------------------------------------------------------------------
+
+    def training_step(self, batch, batch_nb):
+        X, y = batch
+        y_hat = self.forward(X)
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y)
+        loss = self.loss(y_hat, y)
+
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, logger=True)
         self.train_pearson.update(y_hat, y)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
-        y_hat, y = self._ensure_2d(y_hat, y)
-
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y)
         loss = self.loss(y_hat, y)
-        self.log(
-            "val_loss",
-            loss,
-            prog_bar=True,
-            on_step=False,
-            on_epoch=True,
-            logger=True,
-        )
 
+        self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True)
         self.val_pearson.update(y_hat, y)
 
     def on_validation_epoch_end(self):
-        train_pearson = self.train_pearson.compute()
-        val_pearson = self.val_pearson.compute()
-
         val_str = ""
         train_str = ""
 
-        if self.num_outputs == 1:
-            train_value = train_pearson
-            val_value = val_pearson
+        train_pearson = self.train_pearson.compute()
+        val_pearson = self.val_pearson.compute()
+
+        for i in range(self.num_outputs):
+            tr_pearson = train_pearson[i] if self.num_outputs > 1 else train_pearson
+            v_pearson = val_pearson[i] if self.num_outputs > 1 else val_pearson
 
             self.log(
-                f"train_{self.activity_columns[0]}_pearson",
-                train_value,
+                f"train_{self.activity_columns[i]}_pearson",
+                tr_pearson,
                 prog_bar=False,
                 on_epoch=True,
                 logger=True,
             )
             self.log(
-                f"val_{self.activity_columns[0]}_pearson",
-                val_value,
+                f"val_{self.activity_columns[i]}_pearson",
+                v_pearson,
                 prog_bar=True,
                 on_epoch=True,
                 logger=True,
             )
 
-            mean_train_pearson = train_value
-            mean_val_pearson = val_value
+            val_str += f"| Val Pearson {self.activity_columns[i]}: {v_pearson:.5f} "
+            train_str += f"| Train Pearson {self.activity_columns[i]}: {tr_pearson:.5f} "
 
-            train_str = f"| Train Pearson {self.activity_columns[0]}: {train_value:.5f} "
-            val_str = f"| Val Pearson {self.activity_columns[0]}: {val_value:.5f} "
-        else:
-            for i, col in enumerate(self.activity_columns):
-                self.log(
-                    f"train_{col}_pearson",
-                    train_pearson[i],
-                    prog_bar=False,
-                    on_epoch=True,
-                    logger=True,
-                )
-                self.log(
-                    f"val_{col}_pearson",
-                    val_pearson[i],
-                    prog_bar=True,
-                    on_epoch=True,
-                    logger=True,
-                )
+        mean_val_pearson = val_pearson.mean()
+        mean_train_pearson = train_pearson.mean()
 
-                train_str += f"| Train Pearson {col}: {train_pearson[i]:.5f} "
-                val_str += f"| Val Pearson {col}: {val_pearson[i]:.5f} "
-
-            mean_train_pearson = torch.nanmean(train_pearson)
-            mean_val_pearson = torch.nanmean(val_pearson)
-
-            train_str += f"| Mean Train Pearson: {mean_train_pearson:.5f} "
-            val_str += f"| Mean Val Pearson: {mean_val_pearson:.5f} "
-
-        self.log(
-            "val_pearson",
-            mean_val_pearson,
-            prog_bar=True,
-            on_epoch=True,
-            logger=True,
-        )
+        self.log("val_pearson", mean_val_pearson, prog_bar=True, on_epoch=True, logger=True)
 
         self.train_pearson.reset()
         self.val_pearson.reset()
@@ -216,6 +260,10 @@ class LitModel_Fromel(LitModel):
             res_str = f"| Epoch: {self.current_epoch} "
             res_str += f"| Val Loss: {self.trainer.callback_metrics['val_loss']:.5f} "
 
+            if self.num_outputs > 1:
+                val_str += f"| Mean Val Pearson: {mean_val_pearson:.5f} "
+                train_str += f"| Mean Train Pearson: {mean_train_pearson:.5f} "
+
             border = "-" * max(len(res_str), len(val_str), len(train_str))
             print(
                 "\n".join(
@@ -223,57 +271,29 @@ class LitModel_Fromel(LitModel):
                 )
             )
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, _):
         x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
-        y_hat, y = self._ensure_2d(y_hat, y)
-
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y)
         loss = self.loss(y_hat, y)
-        self.log(
-            "test_loss",
-            loss,
-            prog_bar=True,
-            on_step=False,
-            on_epoch=True,
-            logger=True,
-        )
 
+        self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True)
         self.test_pearson.update(y_hat, y)
 
     def on_test_epoch_end(self):
         test_pearson = self.test_pearson.compute()
 
-        if self.num_outputs == 1:
-            self.log(
-                f"test_{self.activity_columns[0]}_pearson",
-                test_pearson,
-                prog_bar=True,
-            )
-        else:
-            for i, col in enumerate(self.activity_columns):
-                self.log(
-                    f"test_{col}_pearson",
-                    test_pearson[i],
-                    prog_bar=True,
-                )
-            self.log(
-                "test_pearson",
-                torch.nanmean(test_pearson),
-                prog_bar=True,
-            )
+        for i in range(self.num_outputs):
+            te_pearson = test_pearson[i] if self.num_outputs > 1 else test_pearson
+            self.log(f"test_{self.activity_columns[i]}_pearson", te_pearson, prog_bar=True)
 
         self.test_pearson.reset()
 
-    def predict_step(self, batch, batch_idx):
+    def predict_step(self, batch, _):
         x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
         pred = self.forward(x)
-        pred, y = self._ensure_2d(pred, y)
-
+        pred, y = self.labels_and_predicted_unsqueeze(pred, y)
         return {
-            "predicted": pred.detach().cpu().float(),
-            "target": y.detach().cpu().float(),
+            "predicted": pred.cpu().detach().float(),
+            "target": y.cpu().detach().float(),
         }
