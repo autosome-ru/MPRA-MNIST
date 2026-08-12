@@ -247,7 +247,7 @@ python3 Gosai_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_num 5
 
 Pearson correlation, r
 
-| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
+| Cell type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
 |-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
 | HepG2 | 0,89 | **0,908** | 0,8727 | 0,8704 | 0,8991 | 0,8971 |
 | K562 | 0,88 | **0,906** | 0,8648 | 0,8663 | 0,8969 | 0,8909 |
