@@ -220,7 +220,7 @@ No other study has used this data for pretraining, so we don't have information 
 
 Pearson correlation, r
 
-| Cel type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+| Cell type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
 |-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
 | HepG2 | minP_avg| #N/A | 0,3336 | 0,2689 | 0.3587 | 0.3897 | 0.3704 |
 | HepG2 | sv40_avg| #N/A | 0,3158 | 0,3053 | 0.1907 | 0.2183 | 0.2135 |

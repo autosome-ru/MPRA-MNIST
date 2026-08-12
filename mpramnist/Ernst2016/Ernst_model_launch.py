@@ -1,160 +1,315 @@
+"""
+Ernst_model_launch.py
+
+Runs a benchmark: trains a multi-output model (one output per cell type) on
+the Ernst2016 dataset, then fine-tunes it for a few epochs at a reduced
+learning rate/weight decay, repeating the whole process `--runs` times.
+Test-time evaluation averages forward-strand and reverse-complement
+predictions before computing the Pearson correlation per cell type.
+
+Results (one row per run, one column per cell type) are appended to a TSV
+file given by `--result_dir`.
+"""
+
+import argparse
+import os
+
+import pandas as pd
 import torch
 import torch.nn as nn
-import os
-import pandas as pd
-
-# multi
-from mpramnist.Ernst2016 import ErnstDataset
-from mpramnist.Ernst2016 import LitModel_Ernst
-
-from mpramnist.models import HumanLegNet
-from mpramnist.models import initialize_weights
-
-from mpramnist.models import BassetBranched
-from mpramnist.models import L1KLmixed
-
-from mpramnist.models import MPRAnn
-
-from mpramnist.models import PARM
-
-from mpramnist.models import DREAM_RNN
-import mpramnist.transforms as t
-
+import lightning.pytorch as L
+from lightning.pytorch import loggers as pl_loggers
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from torch.utils.data import DataLoader
 from torchmetrics import PearsonCorrCoef
 
-import lightning.pytorch as L
-from lightning.pytorch.callbacks import ModelCheckpoint
-
-import argparse 
-parser = argparse.ArgumentParser()
-
-general = parser.add_argument_group('general args', 
-                                    'general_argumens')
-
-general.add_argument("--result_dir",
-                     type=str,
-                     default = "./ernst.tsv")
-general.add_argument("--device", 
-                     type=int,
-                     default=0)
-general.add_argument("--num_workers",
-                     type=int, 
-                     default=103)
-general.add_argument("--batch_size",
-                     type=int, 
-                     default=1024)
-general.add_argument("--runs",
-                     type=int, 
-                     default=5)
-general.add_argument("--model",
-                     type=str, 
-                     default="MPRALegNet") # or Malinois/MPRAnn/PARM   
-
-dataset_args =  parser.add_argument_group('dataset args', 
-                                'dataset arguments')
-
-dataset_args.add_argument("--root", 
-                     type=str, 
-                     default="../data/")
-dataset_args.add_argument("--cell_types",
-                     nargs='+',            # accepts one or more values
-                     default=["k562_minp_avg",
-                            "k562_sv40p_avg",
-                            "hepg2_minp_avg",
-                            "hepg2_sv40p_avg",],
-                     help="List of cell types")
-
-trainer_args =  parser.add_argument_group('trainer args', 
-                                'trainer arguments')
-
-trainer_args.add_argument("--lr",
-                     type=float,
-                     default=0.01)
-trainer_args.add_argument("--wd",
-                     type=float,
-                     default=0.1)
-trainer_args.add_argument("--epoch_num",
-                            type=int,
-                            default=50)
+import mpramnist.transforms as t
+from mpramnist.Ernst2016 import ErnstDataset, LitModel_Ernst
+from mpramnist.models import (
+    HumanLegNet,
+    initialize_weights,
+    BassetBranched,
+    MPRAnn,
+    PARM,
+    DREAM_RNN,
+    Lyra,
+    ReporterNet,
+    initialize_weights_reporternet,
+)
 
 
-args = parser.parse_args()
+# =============================================================================
+# CLI arguments
+# =============================================================================
 
-if isinstance(args.cell_types, str):
-    args.cell_types = [args.cell_types]
+MODEL_CHOICES = [
+    "MPRALegNet",
+    "MPRAnn",
+    "Malinois",
+    "PARM",
+    "DREAM-RNN",
+    "Lyra",
+    "ReporterNet",
+]
 
-if os.path.exists(args.result_dir):
-    results = pd.read_csv(args.result_dir, sep = "\t")
-else:
-    results = pd.DataFrame(columns = args.cell_types)
-
-train_transform = t.Compose([t.ReverseComplement(0.5),t.Seq2Tensor(),])
-test_transform = t.Compose([t.Seq2Tensor(),])
-
-def meaned_prediction(forw, rev, trainer, seq_model, name, num):
-    predictions_forw = trainer.predict(seq_model, dataloaders=forw)
-    targets = torch.cat([pred["target"] for pred in predictions_forw])
-    y_preds_forw = torch.cat([pred["predicted"] for pred in predictions_forw])
-
-    predictions_rev = trainer.predict(seq_model, dataloaders=rev)
-    y_preds_rev = torch.cat([pred["predicted"] for pred in predictions_rev])
-
-    mean_forw = torch.mean(torch.stack([y_preds_forw, y_preds_rev]), dim=0)
-
-    pears = PearsonCorrCoef(num_outputs=num)
-    pearson = pears(mean_forw, targets)
-    print("===========")
-    print(name, " Pearson correlation")
-    print(pearson)
-    print("===========")
-
-    return pears(mean_forw, targets)
+FINETUNE_LR_FACTOR = 0.01
+FINETUNE_WD_FACTOR = 0.01
 
 
-for run in list(range(args.runs)):
-    print(args.cell_types)
-    # Read the MPRAdata, preprocess them and encapsulate them into dataloader form.
-    train_dataset = ErnstDataset(cell_type=args.cell_types, split="train", transform=train_transform, root=args.root,)
-    val_dataset = ErnstDataset(cell_type=args.cell_types, split="val", transform=test_transform, root=args.root,)
-    test_dataset = ErnstDataset(cell_type=args.cell_types, split="test", transform=test_transform, root=args.root,)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Train and evaluate a multi-output model (one output per "
+        "cell type) on the Ernst2016 dataset, with a fine-tuning stage.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
-    # encapsulate data into dataloader form
-    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    general = parser.add_argument_group("general", "General run settings")
+    general.add_argument(
+        "--result_dir",
+        type=str,
+        default="./ernst.tsv",
+        help="Path to the TSV file where per-run Pearson correlations are appended.",
+    )
+    general.add_argument("--device", type=int, default=0, help="GPU device index to use.")
+    general.add_argument(
+        "--num_workers", type=int, default=16, help="Number of DataLoader worker processes."
+    )
+    general.add_argument("--batch_size", type=int, default=1024, help="Batch size.")
+    general.add_argument(
+        "--runs", type=int, default=5, help="Number of independent training runs (repeats)."
+    )
+    general.add_argument(
+        "--model",
+        type=str,
+        default="MPRALegNet",
+        choices=MODEL_CHOICES,
+        help="Model architecture to train.",
+    )
 
-    if args.model == "MPRALegNet":
+    dataset_args = parser.add_argument_group("dataset", "Dataset settings")
+    dataset_args.add_argument("--root", type=str, default="../data/", help="Path to the data root.")
+    dataset_args.add_argument(
+        "--cell_types",
+        nargs="+",
+        default=["k562_minp_avg", "k562_sv40p_avg", "hepg2_minp_avg", "hepg2_sv40p_avg"],
+        help="Cell types to train on jointly; the model gets one output per cell type.",
+    )
+
+    trainer_args = parser.add_argument_group("trainer", "Training hyperparameters")
+    trainer_args.add_argument("--lr", type=float, default=0.01, help="Learning rate.")
+    trainer_args.add_argument("--wd", type=float, default=0.1, help="Weight decay (AdamW).")
+    trainer_args.add_argument("--epoch_num", type=int, default=50, help="Max number of epochs.")
+    trainer_args.add_argument("--finetune_epoch_num", type=int, default=5, help="Finetune number of epochs.")
+
+    args = parser.parse_args()
+
+    if isinstance(args.cell_types, str):
+        args.cell_types = [args.cell_types]
+
+    return args
+
+
+# =============================================================================
+# Transforms
+# =============================================================================
+
+def build_transforms(dataset_cls: type[ErnstDataset], sequence_first: bool = False) -> dict:
+    """Build all the sequence transforms used for training/testing/inference.
+
+    `sequence_first` controls the axis order produced by `Seq2Tensor`. Most
+    models expect channels-first tensor (`sequence_first=False`), but some
+    (e.g. Lyra) expect the sequence-length axis first, so they need
+    `sequence_first=True`.
+
+    Returns a dict with keys: "train", "test", "forward", "reverse".
+    """
+    train_transform = t.Compose(
+        [
+            t.ReverseComplement(0.5),
+            t.Seq2Tensor(sequence_first=sequence_first),
+        ]
+    )
+    test_transform = t.Compose(
+        [
+            t.Seq2Tensor(sequence_first=sequence_first),
+        ]
+    )
+
+    # Used at test time to average forward-strand and reverse-complement predictions.
+    forward_transform = t.Compose(
+        [
+            t.Seq2Tensor(sequence_first=sequence_first),
+        ]
+    )
+    reverse_transform = t.Compose(
+        [
+            t.ReverseComplement(1),
+            t.Seq2Tensor(sequence_first=sequence_first),
+        ]
+    )
+
+    return {
+        "train": train_transform,
+        "test": test_transform,
+        "forward": forward_transform,
+        "reverse": reverse_transform,
+    }
+
+
+# =============================================================================
+# Model factory
+# =============================================================================
+
+def build_model(model_name: str, in_channels: int, seq_len: int, num_outputs: int):
+    """Instantiate the requested model + loss function.
+
+    `in_channels` is the number of one-hot encoded channels (nucleotides).
+    `seq_len` is the length of the input sequence.
+    `num_outputs` is the number of cell types (one model output per cell type).
+    """
+    loss = nn.MSELoss()
+    learning_rate_reduce = True
+    lr_sheduler_to_use = "one_cycle"
+
+    if model_name == "MPRALegNet":
         model = HumanLegNet(
-            in_ch=len(train_dataset[0][0]),
-            output_dim=len(args.cell_types),
+            in_ch=in_channels,
+            output_dim=num_outputs,
             stem_ch=64,
             stem_ks=11,
             ef_ks=9,
             ef_block_sizes=[80, 96, 112, 128],
             pool_sizes=[2, 2, 2, 2],
-            resize_factor=4)
+            resize_factor=4,
+        )
         model.apply(initialize_weights)
-        loss =nn.MSELoss()
-    elif args.model == "MPRAnn":
-        model = MPRAnn(output_dim=len(args.cell_types))
-        loss =nn.MSELoss()
-    elif args.model == "Malinois":
-        length = len(train_dataset[0][0][0])
-        model = BassetBranched(input_len=length, n_outputs=len(args.cell_types))
-        loss =nn.MSELoss()
-    elif args.model == "PARM":
-        model = PARM(n_block=5, type_loss="mse", output_dim=len(args.cell_types))
-        loss =nn.MSELoss()
-    elif args.model =="DREAM-RNN" or args.model == "DREAM_RNN":
-        model = DREAM_RNN(len(train_dataset[0][0]), len(train_dataset[0][0][0]), len(args.cell_types))
-        loss = nn.MSELoss()
 
-    seq_model = LitModel_Ernst(model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, cell_types=args.cell_types, print_each=1)
+    elif model_name == "MPRAnn":
+        model = MPRAnn(output_dim=num_outputs)
 
-    checkpoint_callback = ModelCheckpoint(monitor="val_pearson", mode="max", save_top_k=1, save_last=False)
+    elif model_name == "Malinois":
+        model = BassetBranched(input_len=seq_len, n_outputs=num_outputs)
 
-    # Initialize a trainer
+    elif model_name == "PARM":
+        model = PARM(n_block=5, type_loss="mse", output_dim=num_outputs)
+
+    elif model_name in ("DREAM-RNN", "DREAM_RNN"):
+        model = DREAM_RNN(in_channels=in_channels, seqsize=seq_len, out_channels=num_outputs)
+
+    elif model_name.lower() == "lyra":
+        model = Lyra(d_input=in_channels, d_output=num_outputs, d_model=512, dropout=0.1)
+        lr_sheduler_to_use = "reducelronplateau"
+
+    elif model_name == "ReporterNet":
+        model = ReporterNet(dropout_rate=0.2, output_dim=num_outputs)
+        model.apply(initialize_weights_reporternet)
+        learning_rate_reduce = None
+
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+
+    return model, loss, lr_sheduler_to_use, learning_rate_reduce
+
+
+# =============================================================================
+# Evaluation helpers
+# =============================================================================
+
+def evaluate_with_reverse_complement(
+    forward_loader: DataLoader,
+    reverse_loader: DataLoader,
+    trainer: L.Trainer,
+    lit_model: LitModel_Ernst,
+    cell_types: list[str],
+    num_outputs: int,
+) -> torch.Tensor:
+    """Predict on forward-strand and reverse-complement inputs separately,
+    average the two predictions, and compute the Pearson correlation (per
+    cell type) against the (shared) targets.
+    """
+    forward_preds = trainer.predict(lit_model, dataloaders=forward_loader)
+    targets = torch.cat([batch["target"] for batch in forward_preds])
+    forward_pred_values = torch.cat([batch["predicted"] for batch in forward_preds])
+
+    reverse_preds = trainer.predict(lit_model, dataloaders=reverse_loader)
+    reverse_pred_values = torch.cat([batch["predicted"] for batch in reverse_preds])
+
+    mean_pred = torch.mean(torch.stack([forward_pred_values, reverse_pred_values]), dim=0)
+
+    pearson_metric = PearsonCorrCoef(num_outputs=num_outputs)
+    pearson = pearson_metric(mean_pred, targets)
+
+    print("===========")
+    print(cell_types, " Pearson correlation")
+    print(pearson)
+    print("===========")
+
+    return pearson
+
+
+# =============================================================================
+# Single train + fine-tune + eval run (all cell types trained jointly)
+# =============================================================================
+
+def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: dict) -> torch.Tensor:
+    """Train a fresh multi-output model on all requested cell types, fine-tune
+    it for a few epochs at a reduced learning rate/weight decay, and return
+    the per-cell-type test Pearson correlations.
+    """
+    print(f"\n### Run {run_idx + 1}/{args.runs} — model: {args.model} — cell types: {args.cell_types} ###")
+
+    # ---- Data ---------------------------------------------------------
+    train_dataset = ErnstDataset(
+        cell_type=args.cell_types, split="train", transform=transforms["train"], root=args.root
+    )
+    val_dataset = ErnstDataset(
+        cell_type=args.cell_types, split="val", transform=transforms["test"], root=args.root
+    )
+
+    train_loader = DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
+    )
+
+    sample_seq = train_dataset[0][0]
+    if args.model.lower() == "lyra":
+        # sequence_first=True -> tensor shape is (L, C)
+        seq_len, in_channels = sample_seq.shape[0], sample_seq.shape[1]
+    else:
+        # channels-first -> tensor shape is (C, L)
+        in_channels, seq_len = sample_seq.shape[0], sample_seq.shape[1]
+
+    # ---- Model ----------------------------------------------------------
+    model, loss, lr_sheduler_to_use, learning_rate_reduce = build_model(
+        model_name=args.model,
+        in_channels=in_channels,
+        seq_len=seq_len,
+        num_outputs=len(args.cell_types),
+    )
+
+    lit_model = LitModel_Ernst(
+        model=model,
+        loss=loss,
+        weight_decay=args.wd,
+        lr=args.lr,
+        cell_types=args.cell_types,
+        print_each=1,
+        lr_sheduler_to_use=lr_sheduler_to_use,
+        learning_rate_reduce=learning_rate_reduce,
+    )
+
+    # ---- Trainer setup --------------------------------------------------
+    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name="Ernst")
+
+    early_stopping_callback = EarlyStopping(
+        monitor="val_pearson", mode="max", patience=8, min_delta=0.0
+    )
+    checkpoint_callback = ModelCheckpoint(
+        monitor="val_pearson", mode="max", save_top_k=1, save_last=False
+    )
+
     trainer = L.Trainer(
         accelerator="gpu",
         devices=[args.device],
@@ -163,45 +318,113 @@ for run in list(range(args.runs)):
         precision="16-mixed",
         enable_progress_bar=True,
         num_sanity_val_steps=0,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, early_stopping_callback],
+        logger = logger
     )
 
-    # Train the model
-    trainer.fit(seq_model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    # ---- Train --------------------------------------------------------
+    trainer.fit(lit_model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
+    # ---- Fine-tune: reload best checkpoint, then train a few more epochs
+    #      at a reduced learning rate / weight decay -----------------------
     best_model_path = checkpoint_callback.best_model_path
-    seq_model_finetune = LitModel_Ernst.load_from_checkpoint(best_model_path,model=model, loss=nn.MSELoss(), weight_decay=args.wd*0.01, lr=args.lr*0.01, cell_types=args.cell_types, print_each=1)
+    lit_model_finetune = LitModel_Ernst.load_from_checkpoint(
+        best_model_path,
+        model=model,
+        loss=loss,
+        weight_decay=args.wd * FINETUNE_WD_FACTOR,
+        lr=args.lr * FINETUNE_LR_FACTOR,
+        cell_types=args.cell_types,
+        print_each=1,
+        learning_rate_reduce=learning_rate_reduce,
+    )
 
-    checkpoint_callback_finetune = ModelCheckpoint(monitor="val_pearson", mode="max", save_top_k=1, save_last=False)
+    checkpoint_callback_finetune = ModelCheckpoint(
+        monitor="val_pearson", mode="max", save_top_k=1, save_last=False
+    )
 
     trainer = L.Trainer(
         accelerator="gpu",
-        devices=[0],
-        max_epochs=5,
+        devices=[args.device],
+        max_epochs=args.finetune_epoch_num,
         gradient_clip_val=1,
         precision="16-mixed",
         enable_progress_bar=False,
         num_sanity_val_steps=0,
         callbacks=[checkpoint_callback_finetune],
     )
-    trainer.fit(
-    seq_model_finetune, train_dataloaders=train_loader, val_dataloaders=val_loader
-    )
+    trainer.fit(lit_model_finetune, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
     best_model_path = checkpoint_callback_finetune.best_model_path
-    seq_model_finetune = LitModel_Ernst.load_from_checkpoint(best_model_path,model=model, loss=nn.MSELoss(), weight_decay=args.wd*0.01, lr=args.lr*0.01, cell_types=args.cell_types, print_each=1)
+    lit_model_finetune = LitModel_Ernst.load_from_checkpoint(
+        best_model_path,
+        model=model,
+        loss=loss,
+        weight_decay=args.wd * FINETUNE_WD_FACTOR,
+        lr=args.lr * FINETUNE_LR_FACTOR,
+        cell_types=args.cell_types,
+        print_each=1,
+    )
 
-    forw_transform = t.Compose([t.Seq2Tensor()])
-    rev_transform = t.Compose([t.ReverseComplement(1),t.Seq2Tensor(),])
+    # ---- Test: average forward-strand and reverse-complement predictions --
+    test_forward_dataset = ErnstDataset(
+        cell_type=args.cell_types, split="test", transform=transforms["forward"], root=args.root
+    )
+    test_reverse_dataset = ErnstDataset(
+        cell_type=args.cell_types, split="test", transform=transforms["reverse"], root=args.root
+    )
 
-    test_forw = ErnstDataset(cell_type=args.cell_types, split="test", transform=forw_transform, root=args.root)
-    test_rev = ErnstDataset(cell_type=args.cell_types, split="test", transform=rev_transform, root=args.root)
+    forward_loader = DataLoader(
+        test_forward_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True,
+    )
+    reverse_loader = DataLoader(
+        test_reverse_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True,
+    )
 
-    forw = DataLoader(dataset=test_forw, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,)
-    rev = DataLoader(dataset=test_rev, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,)
+    pearson = evaluate_with_reverse_complement(
+        forward_loader,
+        reverse_loader,
+        trainer,
+        lit_model_finetune,
+        args.cell_types,
+        num_outputs=len(args.cell_types),
+    )
 
-    corr_pearson = meaned_prediction(forw, rev, trainer, seq_model_finetune, args.cell_types, len(args.cell_types))
+    return pearson
 
-    results.loc[len(results)] = corr_pearson.numpy()
 
-    results.to_csv(args.result_dir, sep = "\t", index = False)
+# =============================================================================
+# Main
+# =============================================================================
+
+def load_or_create_results(result_path: str, cell_types: list[str]) -> pd.DataFrame:
+    if os.path.exists(result_path):
+        return pd.read_csv(result_path, sep="\t")
+    return pd.DataFrame(columns=cell_types)
+
+
+def main() -> None:
+    args = parse_args()
+    results = load_or_create_results(args.result_dir, args.cell_types)
+
+    # Lyra expects sequence-length-first tensors; every other model here
+    # expects channels-first tensors.
+    sequence_first = args.model.lower() == "lyra"
+    transforms = build_transforms(ErnstDataset, sequence_first=sequence_first)
+
+    for run_idx in range(args.runs):
+        pearson = run_single_training_run(run_idx, args, transforms)
+        results.loc[len(results)] = pearson.numpy()
+        results.to_csv(args.result_dir, sep="\t", index=False)
+
+
+if __name__ == "__main__":
+    main()
