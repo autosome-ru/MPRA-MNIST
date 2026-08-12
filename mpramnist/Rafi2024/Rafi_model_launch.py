@@ -315,7 +315,7 @@ def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: 
         model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1, lr_sheduler_to_use=lr_sheduler_to_use, learning_rate_reduce=learning_rate_reduce,)
 
     # ---- Trainer setup ----------------------------------------------------
-    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name="Rafi_try_orig_params")
+    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name="Rafi")
 
     early_stopping_callback = EarlyStopping(
         monitor="val_pearson", mode="max", patience=8, min_delta=0.0
