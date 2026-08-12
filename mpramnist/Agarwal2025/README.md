@@ -288,7 +288,7 @@ python3 AgarwalMulti_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoc
 
 Pearson correlation, r
 
-| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
+| Cell type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
 |-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
 | HepG2 | **0,8189** | 0,806 | 0,7736 | 0.7274 | 0.7985 | 0.7767 |
 | K562 | **0,8514** | 0,83 | 0,7901 | 0.7816 | 0.823 | 0.8012 |
@@ -298,7 +298,7 @@ Pearson correlation, r
 
 Pearson correlation, r
 
-| Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+| Cell type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
 |-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
 | HepG2 | 0,78 | **0,798** | 0,7633 | 0.708170 | 0.7886 | 0.742 |
 | K562 | 0,75 | **0,759** | 0,7248 | 0.666216 | 0.755 | 0.6883 |
