@@ -205,12 +205,12 @@ Pearson correlation, r
 
 | Cell type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
 |-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
-| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Native | 0,931 | 0,979 | 0,9697 | 0,9711 | 0,964 | 0.9643 |
-| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Drift | 0,968 | 0,986 | 0,984 | 0,9736 | 0,9734 | 0.9779 |
-| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Paired | 0,847 | 0,853 | 0,8507 | 0,831 | 0,8338 | 0.8421 |
-| strains Y8205, S288C::ura3, etc | YPD (complex) Native | 0,948 | 0,975 | 0,9672 | 0,9686 | 0,9587 | 0.9628 |
-| strains Y8205, S288C::ura3, etc | YPD (complex) Drift | 0,98 | 0,985 | 0,9856 | 0,9752 | 0,9745 | 0.9801 |
-| strains Y8205, S288C::ura3, etc | YPD (complex) Paired | 0,869 | 0,879 | 0,8793 | 0,8566 | 0,86 | 0.8674 |
+| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Native | 0,931 | 0,979 | 0,9697 | 0,9711 | 0,964 | 0,9643 |
+| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Drift | 0,968 | 0,986 | 0,984 | 0,9736 | 0,9734 | 0,9779 |
+| strains Y8205, S288C::ura3, etc | SD-Ura (defined) Paired | 0,847 | 0,853 | 0,8507 | 0,831 | 0,8338 | 0,8421 |
+| strains Y8205, S288C::ura3, etc | YPD (complex) Native | 0,948 | 0,975 | 0,9672 | 0,9686 | 0,9587 | 0,9628 |
+| strains Y8205, S288C::ura3, etc | YPD (complex) Drift | 0,98 | 0,985 | 0,9856 | 0,9752 | 0,9745 | 0,9801 |
+| strains Y8205, S288C::ura3, etc | YPD (complex) Paired | 0,869 | 0,879 | 0,8793 | 0,8566 | 0,86 | 0,8674 |
  
 
 ## Citation
