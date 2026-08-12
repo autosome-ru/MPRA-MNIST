@@ -191,26 +191,24 @@ python3 Rafi_model_launch.py --model MPRAnn --epoch_num 30 --runs 5 --result_dir
 #PARM
 python3 Rafi_model_launch.py --model PARM --epoch_num 30 --runs 5 --result_dir ./rafi_parm.tsv
 #DREAM-RNN
-python3 Rafi_model_launch.py --model DREAM-RNN --epoch_num 30 --runs 5 --result_dir ./rafi_dream_rnn.tsv
+python3 Rafi_model_launch.py --model DREAM-RNN --lr 0.005 --wd 0.01 --epoch_num 80 --runs 1 --result_dir ./rafi_dream_rnn_try_orig_params.tsv
 ```
-
-## Original Benchmark Quality
 
 ## Achieved Performance Using Basic Models
 
 Pearson correlation, r^2
 
-| Cell type | Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
-|-----------|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
-| AGS | All Sequences | 0,95 | 0,928 | 0,8521 | 0,7649 | 0,7741 | 0,95 |
-| HAP1 | High | 0,51 | 0,285 | 0,0768 | 0,0378 | 0,0477 | 0,51 |
-| HepG2 | Low | 0,51 | 0,152 | 0,2553 | 0,1109 | 0,1279 | 0,51 |
-| K562 | Native | 0,78 | 0,745 | 0,6274 | 0,4144 | 0,407 | 0,78 |
-| MCF7 | Random | 0,96 | 0,951 | 0,9238 | 0,8391 | 0,859 | 0,96 |
-| U2OS | Challenging | 0,94 | 0,909 | 0,7252 | 0,6494 | 0,7033 | 0,94 |
-| HCT116 | SNVs | 0,73 | 0,688 | 0,5297 | 0,3366 | 0,3487 | 0,73 |
-| HEK293 | Motif Perturbation | 0,96 | 0,945 | 0,8683 | 0,7209 | 0,7838 | 0,96 |
-| LNCaP | Motif Tiling | 0,91 | 0,855 | 0,6644| 0,5916 | 0,5131 | 0,91 |
+Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
+|:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
+| All Sequences | 0,95 | 0,928 | 0,8521 | 0,7649 | 0,7741 | 0,95 |
+| High | 0,51 | 0,285 | 0,0768 | 0,0378 | 0,0477 | 0,51 |
+| Low | 0,51 | 0,152 | 0,2553 | 0,1109 | 0,1279 | 0,51 |
+| Native | 0,78 | 0,745 | 0,6274 | 0,4144 | 0,407 | 0,78 |
+| Random | 0,96 | 0,951 | 0,9238 | 0,8391 | 0,859 | 0,96 |
+| Challenging | 0,94 | 0,909 | 0,7252 | 0,6494 | 0,7033 | 0,94 |
+| SNVs | 0,73 | 0,688 | 0,5297 | 0,3366 | 0,3487 | 0,73 |
+| Motif Perturbation | 0,96 | 0,945 | 0,8683 | 0,7209 | 0,7838 | 0,96 |
+| Motif Tiling | 0,91 | 0,855 | 0,6644| 0,5916 | 0,5131 | 0,91 |
 
  
 
