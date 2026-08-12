@@ -1,99 +1,169 @@
 import torch
 import torch.nn as nn
 import lightning.pytorch as L
-import numpy as np
-
+from lightning.pytorch.callbacks import EarlyStopping
 from torchmetrics import PearsonCorrCoef
-from torchmetrics import (
-    Accuracy,
-    AUROC,
-    AveragePrecision,
-    Precision,
-    Recall,
-    F1Score,
-)
+
+import numpy as np
+import torch.nn.functional as F
+from itertools import cycle
+
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import label_binarize
 from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
     auc,
     roc_curve,
 )
-
-import matplotlib.pyplot as plt
-from itertools import cycle
-
+    
 class LitModel_Reddy_Reg(L.LightningModule):
-
-    def __init__(self, model,cell_types, loss = nn.MSELoss(), print_each = 1, weight_decay=1e-2, lr=3e-4, ):
-
+    def __init__(
+        self,
+        model,
+        loss=nn.MSELoss(),
+        print_each: int = 1,
+        weight_decay: float = 1e-2,
+        lr: float = 3e-4,
+        cell_types: list[str] = ["JURKAT", "K562", "THP1"],
+        lr_sheduler_to_use = "one_cycle", # or reducelronplateau
+        # Early stopping
+        early_stopping_patience: int = 10,
+        early_stopping_metric: str = "val_loss",
+        early_stopping_mode: str = "min",
+        # LR scheduling
+        learning_rate_reduce: bool = True,
+        learning_rate_reduce_patience: int = 5,
+        learning_rate_reduce_metric: str = "val_loss",
+        learning_rate_reduce_mode: str = "min",
+    ):
         super().__init__()
 
         self.model = model
-
         self.loss = loss
         self.print_each = print_each
         self.weight_decay = weight_decay
         self.lr = lr
+        self.lr_sheduler_to_use = lr_sheduler_to_use
 
-        num_outputs = len(cell_types)
+        # Early stopping config — consumed by configure_callbacks()
+        self.early_stopping_patience = early_stopping_patience
+        self.early_stopping_metric = early_stopping_metric
+        self.early_stopping_mode = early_stopping_mode
 
-        self.num_outputs = num_outputs
+        # ReduceLROnPlateau config — consumed by configure_optimizers()
+        self.learning_rate_reduce = learning_rate_reduce
+        self.learning_rate_reduce_patience = learning_rate_reduce_patience
+        self.learning_rate_reduce_metric = learning_rate_reduce_metric
+        self.learning_rate_reduce_mode = learning_rate_reduce_mode
 
         if isinstance(cell_types, str):
             cell_types = [cell_types]
 
         self.cell_types = cell_types
+        self.num_outputs = len(cell_types)
 
-        self.train_pearson = PearsonCorrCoef(num_outputs=num_outputs)
-        self.val_pearson = PearsonCorrCoef(num_outputs=num_outputs)
-        self.test_pearson = PearsonCorrCoef(num_outputs=num_outputs)
+        self.train_pearson = PearsonCorrCoef(num_outputs=self.num_outputs)
+        self.val_pearson = PearsonCorrCoef(num_outputs=self.num_outputs)
+        self.test_pearson = PearsonCorrCoef(num_outputs=self.num_outputs)
+
+    # ------------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------------
+
+    def configure_callbacks(self):
+        return [
+            EarlyStopping(
+                monitor=self.early_stopping_metric,
+                patience=self.early_stopping_patience,
+                mode=self.early_stopping_mode,
+                verbose=True,
+            )
+        ]
+    
+    # ------------------------------------------------------------------
 
     def forward(self, x):
-
         return self.model(x)
-    
+
     def labels_and_predicted_unsqueeze(self, pred, targets):
         if pred.dim() == 1:
-            pred = pred.unsqueeze(-1)  # [1076] -> [1076, 1]
+            pred = pred.unsqueeze(-1)       # [N] -> [N, 1]
         if targets.dim() == 1:
-            targets = targets.unsqueeze(-1)  # [1076] -> [1076, 1]
+            targets = targets.unsqueeze(-1) # [N] -> [N, 1]
         return pred, targets
 
+    # ------------------------------------------------------------------
+    # Optimiser + scheduler
+    # ------------------------------------------------------------------
+
+    def configure_optimizers(self):
+            optimizer = torch.optim.AdamW(
+                self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+            )
+    
+            if not self.learning_rate_reduce:
+                return optimizer
+    
+            if self.lr_sheduler_to_use == "one_cycle":
+                lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                    optimizer,
+                    max_lr=self.lr,
+                    three_phase=False,
+                    total_steps=self.trainer.estimated_stepping_batches,
+                    pct_start=0.3,
+                    cycle_momentum=False,
+                )
+                lr_scheduler_config = {
+                    "scheduler": lr_scheduler,
+                    "interval": "step",
+                    "frequency": 1,
+                    "name": "cycle_lr",
+                }
+            elif self.lr_sheduler_to_use == "reducelronplateau":
+                lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer,
+                    mode=self.learning_rate_reduce_mode,
+                    patience=self.learning_rate_reduce_patience,
+                )
+                lr_scheduler_config = {
+                    "scheduler": lr_scheduler,
+                    "monitor": self.learning_rate_reduce_metric,
+                    "interval": "epoch",
+                    "frequency": 1,
+                    "name": "reduce_lr_on_plateau",
+                }
+    
+            return [optimizer], [lr_scheduler_config]
+
+    # ------------------------------------------------------------------
+    # Steps
+    # ------------------------------------------------------------------
+
     def training_step(self, batch, batch_nb):
-        
-        x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
-        y_hat = self.forward(x)
-                  
-        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
-        
+        X, y = batch
+        y_hat = self.forward(X)
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y)
         loss = self.loss(y_hat, y)
 
-        self.log(
-            "train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, logger=True
-        )
-
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, logger=True)
         self.train_pearson.update(y_hat, y)
-
         return loss
 
     def validation_step(self, batch, batch_idx):
-
         x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
-
-        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
-
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y)
         loss = self.loss(y_hat, y)
-        self.log(
-            "val_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True
-        )
 
+        self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True)
         self.val_pearson.update(y_hat, y)
 
     def on_validation_epoch_end(self):
-
         val_str = ""
         train_str = ""
 
@@ -101,37 +171,31 @@ class LitModel_Reddy_Reg(L.LightningModule):
         val_pearson = self.val_pearson.compute()
 
         for i in range(self.num_outputs):
-            name_train_metric = "train_" + self.cell_types[i] + "_pearson"
-            name_val_metric = "val_" + self.cell_types[i] + "_pearson"
-
             tr_pearson = train_pearson[i] if self.num_outputs > 1 else train_pearson
             v_pearson = val_pearson[i] if self.num_outputs > 1 else val_pearson
+
             self.log(
-                name_train_metric,
+                f"train_{self.cell_types[i]}_pearson",
                 tr_pearson,
                 prog_bar=False,
                 on_epoch=True,
                 logger=True,
             )
             self.log(
-                name_val_metric,
+                f"val_{self.cell_types[i]}_pearson",
                 v_pearson,
                 prog_bar=True,
                 on_epoch=True,
                 logger=True,
             )
 
-            val_str += (
-                f"| Val Pearson {self.cell_types[i]}: {v_pearson:.5f} "
-            )
+            val_str += f"| Val Pearson {self.cell_types[i]}: {v_pearson:.5f} "
             train_str += f"| Train Pearson {self.cell_types[i]}: {tr_pearson:.5f} "
 
         mean_val_pearson = val_pearson.mean()
         mean_train_pearson = train_pearson.mean()
 
-        self.log(
-            "val_pearson", mean_val_pearson, prog_bar=True, on_epoch=True, logger=True
-        )
+        self.log("val_pearson", mean_val_pearson, prog_bar=True, on_epoch=True, logger=True)
 
         self.train_pearson.reset()
         self.val_pearson.reset()
@@ -153,17 +217,11 @@ class LitModel_Reddy_Reg(L.LightningModule):
 
     def test_step(self, batch, _):
         x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
         y_hat = self.forward(x)
-
-        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y) # [1076] -> [1076, 1]
-
+        y_hat, y = self.labels_and_predicted_unsqueeze(y_hat, y)
         loss = self.loss(y_hat, y)
-        self.log(
-            "test_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True
-        )
 
+        self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True)
         self.test_pearson.update(y_hat, y)
 
     def on_test_epoch_end(self):
@@ -171,278 +229,109 @@ class LitModel_Reddy_Reg(L.LightningModule):
 
         for i in range(self.num_outputs):
             te_pearson = test_pearson[i] if self.num_outputs > 1 else test_pearson
-            name_of_metric = "test_" + self.cell_types[i] + "_pearson"
-            self.log(name_of_metric, te_pearson, prog_bar=True)
+            self.log(f"test_{self.cell_types[i]}_pearson", te_pearson, prog_bar=True)
 
         self.test_pearson.reset()
 
     def predict_step(self, batch, _):
         x, y = batch
-        if x.ndim == 3 and x.shape[2] < x.shape[1]:
-            x = x.permute(0, 2, 1)
         pred = self.forward(x)
-
-        pred, y = self.labels_and_predicted_unsqueeze(pred, y) # [1076] -> [1076, 1]
-
+        pred, y = self.labels_and_predicted_unsqueeze(pred, y)
         return {
             "predicted": pred.cpu().detach().float(),
             "target": y.cpu().detach().float(),
         }
 
-    def configure_optimizers(self):
-
-        self.optimizer = torch.optim.AdamW(
-            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
-
-        lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            self.optimizer,
-            max_lr=self.lr,
-            three_phase=False,
-            total_steps=self.trainer.estimated_stepping_batches,
-            pct_start=0.3,
-            cycle_momentum=False,
-        )
-        lr_scheduler_config = {
-            "scheduler": lr_scheduler,
-            "interval": "step",
-            "frequency": 1,
-            "name": "cycle_lr",
-        }
-
-        return [self.optimizer], [lr_scheduler_config]
-
 
 class LitModel_Reddy_Clas(L.LightningModule):
     def __init__(
         self,
-        weight_decay,
-        lr,
-        n_labels=3,
-        show_figure=True,
-        model=None,
-        loss=nn.BCEWithLogitsLoss(),
-        print_each=1,
+        model,
+        loss=nn.CrossEntropyLoss(),
+        print_each: int = 1,
+        weight_decay: float = 1e-2,
+        lr: float = 3e-4,
+        cell_types: list[str] = ["JURKAT", "K562", "THP1"],
+        n_classes: int = 10,
+        # Early stopping
+        early_stopping_patience: int = 10,
+        early_stopping_metric: str = "val_loss",
+        early_stopping_mode: str = "min",
+        # LR scheduling (OneCycleLR)
+        lr_pct_start: float = 0.3,
     ):
         super().__init__()
 
         self.model = model
-
         self.loss = loss
         self.print_each = print_each
         self.weight_decay = weight_decay
         self.lr = lr
+        self.lr_pct_start = lr_pct_start
 
-        self.val_acc = Accuracy(task="multilabel", num_labels=n_labels)
-        self.val_auroc = AUROC(task="multilabel", num_labels=n_labels)
-        self.val_aupr = AveragePrecision(task="multilabel", num_labels=n_labels)
-        self.val_precision = Precision(
-            task="multilabel", num_labels=n_labels, average="macro"
-        )
-        self.val_recall = Recall(
-            task="multilabel", num_labels=n_labels, average="macro"
-        )
-        self.val_f1 = F1Score(task="multilabel", num_labels=n_labels, average="macro")
+        # Early stopping config — consumed by configure_callbacks()
+        self.early_stopping_patience = early_stopping_patience
+        self.early_stopping_metric = early_stopping_metric
+        self.early_stopping_mode = early_stopping_mode
 
-        self.test_acc = Accuracy(task="multilabel", num_labels=n_labels)
-        self.test_auroc = AUROC(task="multilabel", num_labels=n_labels)
-        self.test_aupr = AveragePrecision(task="multilabel", num_labels=n_labels)
-        self.test_precision = Precision(
-            task="multilabel", num_labels=n_labels, average="macro"
-        )
-        self.test_recall = Recall(
-            task="multilabel", num_labels=n_labels, average="macro"
-        )
-        self.test_f1 = F1Score(task="multilabel", num_labels=n_labels, average="macro")
+        if isinstance(cell_types, str):
+            cell_types = [cell_types]
 
-        # for plotting
-        self.n_labels = n_labels
-        self.show_figure = show_figure
+        self.cell_types = cell_types
+        self.n_classes = n_classes
+        # assumes classes are split evenly across cell types, e.g. 10 classes / 2 cell
+        # types -> 5 classes per cell type (logits sliced accordingly in compute_loss)
+        self.classes_per_cell_type = n_classes // len(cell_types)
+
         self.y_score = torch.tensor([])
         self.y_true = torch.tensor([])
+
+    # ------------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------------
+
+    def configure_callbacks(self):
+        return [
+            EarlyStopping(
+                monitor=self.early_stopping_metric,
+                patience=self.early_stopping_patience,
+                mode=self.early_stopping_mode,
+                verbose=True,
+            )
+        ]
 
     def setup(self, stage=None):
         self.y_score = self.y_score.to(self.device)
         self.y_true = self.y_true.to(self.device)
 
-    def training_step(self, batch, batch_nb):
-        X, y = batch
-        y_hat = self.model(X)
-        y = y.float()
+    # ------------------------------------------------------------------
 
-        loss = self.loss(y_hat, y)
+    def forward(self, x):
+        return self.model(x)
+
+    def compute_loss(self, y_hat, y):
+        """Sums the per-cell-type CrossEntropy loss over sliced logit blocks."""
+        n = self.classes_per_cell_type
+        loss = 0.0
+        for i in range(len(self.cell_types)):
+            loss = loss + self.loss(y_hat[:, i * n : (i + 1) * n], y[:, i])
         return loss
 
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self.model(x)
-        y = y.float()
+    # ------------------------------------------------------------------
+    # Optimiser + scheduler
+    # ------------------------------------------------------------------
 
-        loss = self.loss(y_hat, y)
-
-        y_metrics = y.long()
-
-        self.val_acc(y_hat, y_metrics)
-        self.val_auroc(y_hat, y_metrics)
-        self.val_aupr(y_hat, y_metrics)
-        self.val_precision(y_hat, y_metrics)
-        self.val_recall(y_hat, y_metrics)
-        self.val_f1(y_hat, y_metrics)
-
-        self.log("val_loss", loss, on_epoch=True, prog_bar=True)
-
-    def on_validation_epoch_end(self):
-        if (self.current_epoch + 1) % self.print_each == 0:
-            res_str = f"| Epoch: {self.current_epoch} "
-            res_str += f"| Val Acc: {self.val_acc.compute()} "
-            res_str += f"| Val AUROC: {self.val_auroc.compute()} "
-            res_str += f"| Val AUPR: {self.val_aupr.compute()} |"
-            res_str += f"\n| Val Precision: {self.val_precision.compute()} "
-            res_str += f"| Val Recall: {self.val_recall.compute()} "
-            res_str += f"| Val F1: {self.val_f1.compute()} "
-            border = "-" * 100
-            print("\n".join(["", border, res_str, border, ""]))
-
-        self.val_acc.reset()
-        self.val_auroc.reset()
-        self.val_aupr.reset()
-        self.val_precision.reset()
-        self.val_recall.reset()
-        self.val_f1.reset()
-
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self.model(x)
-        y = y.float()
-
-        loss = self.loss(y_hat, y)
-
-        y_metrics = y.long()
-
-        self.test_acc(y_hat, y_metrics)
-        self.test_auroc(y_hat, y_metrics)
-        self.test_aupr(y_hat, y_metrics)
-        self.test_precision(y_hat, y_metrics)
-        self.test_recall(y_hat, y_metrics)
-        self.test_f1(y_hat, y_metrics)
-
-        self.log("test_loss", loss, on_epoch=True, prog_bar=True)
-
-        # for plotting
-        self.y_score = torch.cat([self.y_score, y_hat])
-        self.y_true = torch.cat([self.y_true, y])
-
-    def on_test_epoch_end(self):
-        res_str = f"| Test Acc: {self.test_acc.compute()} "
-        res_str += f"| Test AUROC: {self.test_auroc.compute()} "
-        res_str += f"| Test AUPR: {self.test_aupr.compute()} |"
-        res_str += f"\n| Test Precision: {self.test_precision.compute()} "
-        res_str += f"| Test Recall: {self.test_recall.compute()} "
-        res_str += f"| Test F1: {self.test_f1.compute()} "
-        border = "-" * 100
-        print("\n".join(["", border, res_str, border, ""]))
-
-        if self.show_figure:
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-
-        self.calculate_auroc(
-            self.y_score, self.y_true, self.n_labels, ax1 if self.show_figure else None
-        )
-        self.plot_hist(
-            self.y_score, self.y_true, self.n_labels, ax2 if self.show_figure else None
-        )
-
-        if self.show_figure:
-            plt.tight_layout()
-            plt.show()
-
-        self.test_acc.reset()
-        self.test_auroc.reset()
-        self.test_aupr.reset()
-        self.test_precision.reset()
-        self.test_recall.reset()
-        self.test_f1.reset()
-        self.y_score = torch.tensor([], device=self.device)
-        self.y_true = torch.tensor([], device=self.device)
-
-    def calculate_auroc(self, y_score, y_true, n_labels, ax=None):
-        y_score = torch.sigmoid(y_score.float()).cpu().numpy()
-        y_true = y_true.cpu().numpy()
-
-        fpr, tpr, roc_auc = dict(), dict(), dict()
-
-        # Compute ROC curve and AUC for each label
-        for i in range(n_labels):
-            fpr[i], tpr[i], _ = roc_curve(y_true[:, i], y_score[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-
-        if ax is not None:
-            colors = cycle(
-                ["orange", "green", "red", "purple", "blue", "yellow", "cyan", "brown"]
-            )
-
-            # Plot ROC curves for each label
-            for i, color in zip(range(n_labels), colors):
-                ax.plot(
-                    fpr[i],
-                    tpr[i],
-                    color=color,
-                    lw=1,
-                    label=f"Label {i} (AUC = {roc_auc[i]:0.2f})",
-                )
-
-            ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random (AUC = 0.5)")
-            ax.set_xlim([-0.05, 1.0])
-            ax.set_ylim([0.0, 1.05])
-            ax.set_xlabel("False Positive Rate")
-            ax.set_ylabel("True Positive Rate")
-            ax.set_title("ROC Curves for each label")
-            ax.legend(loc="lower right")
-
-    def plot_hist(self, y_score, y_true, n_labels, ax=None):
-        y_score = torch.sigmoid(y_score.float()).cpu().numpy()
-        y_pred = (y_score > 0.5).astype(int)
-        y_true = y_true.cpu().numpy()
-
-        # Plot histogram if axis is provided
-        if ax is not None:
-            pos_counts = np.sum(y_pred, axis=0)
-
-            ax.bar(np.arange(n_labels), pos_counts, color="skyblue", edgecolor="black")
-
-            for i, count in enumerate(pos_counts):
-                ax.text(
-                    i,
-                    count,
-                    str(count),
-                    ha="center",
-                    va="bottom",
-                    fontsize=10,
-                    fontweight="bold",
-                )
-
-            ax.set_xlabel("Label")
-            ax.set_ylabel("Positive predictions count")
-            ax.set_title("Positive predictions per label")
-            ax.grid(axis="y", linestyle="--", alpha=0.7)
-
-    def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        x, y = batch
-        y_hat = self.model(x)
-        return {"y": y.squeeze().float().cpu().detach(), "pred": y_hat.cpu().detach()}
-    
     def configure_optimizers(self):
-
-        self.optimizer = torch.optim.AdamW(
+        optimizer = torch.optim.AdamW(
             self.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
 
         lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            self.optimizer,
+            optimizer,
             max_lr=self.lr,
             three_phase=False,
             total_steps=self.trainer.estimated_stepping_batches,
-            pct_start=0.3,
+            pct_start=self.lr_pct_start,
             cycle_momentum=False,
         )
         lr_scheduler_config = {
@@ -452,4 +341,153 @@ class LitModel_Reddy_Clas(L.LightningModule):
             "name": "cycle_lr",
         }
 
-        return [self.optimizer], [lr_scheduler_config]
+        return [optimizer], [lr_scheduler_config]
+
+    # ------------------------------------------------------------------
+    # Steps
+    # ------------------------------------------------------------------
+
+    def training_step(self, batch, batch_nb):
+        x, y = batch
+        y_hat = self.forward(x)
+        y = y.long()
+
+        loss = self.compute_loss(y_hat, y)
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, logger=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        y = y.long()
+
+        loss = self.compute_loss(y_hat, y)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+
+        self.y_score = torch.cat([self.y_score, y_hat])
+        self.y_true = torch.cat([self.y_true, y])
+
+    def on_validation_epoch_end(self):
+        if (self.current_epoch + 1) % self.print_each == 0:
+            print("\n| {}: {:.5f} |\n".format("Current_epoch", self.current_epoch))
+            self.shared_test_val_epoch_end()
+        self.y_score = torch.tensor([], device=self.device)
+        self.y_true = torch.tensor([], device=self.device)
+
+    def test_step(self, batch, _):
+        x, y = batch
+        y_hat = self.forward(x)
+        y = y.long()
+
+        loss = self.compute_loss(y_hat, y)
+        self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+
+        self.y_score = torch.cat([self.y_score, y_hat])
+        self.y_true = torch.cat([self.y_true, y])
+
+    def on_test_epoch_end(self):
+        self.shared_test_val_epoch_end(show_figure=True)
+        self.y_score = torch.tensor([], device=self.device)
+        self.y_true = torch.tensor([], device=self.device)
+
+    def predict_step(self, batch, _):
+        x, y = batch
+        y_hat = self.forward(x)
+        return {
+            "predicted": y_hat.cpu().detach().float(),
+            "target": y.cpu().detach().float(),
+        }
+
+    # ------------------------------------------------------------------
+    # Metrics / reporting
+    # ------------------------------------------------------------------
+
+    def shared_test_val_epoch_end(self, show_figure: bool = False):
+        border = "-" * 100
+        plt_index = 0
+        n = self.classes_per_cell_type
+
+        fig, ax1, ax2 = (None, None, None)
+        if show_figure:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+            fig.suptitle("ROC Curves Comparison", fontsize=14)
+
+        for i, cell_type in enumerate(self.cell_types):
+            y_score_i = self.y_score[:, i * n : (i + 1) * n]
+            y_true_i = self.y_true[:, i]
+
+            auroc = self.calculate_auroc(
+                y_score=y_score_i,
+                y_true=y_true_i,
+                n_classes=n,
+                show_figure=show_figure,
+                name=cell_type,
+                ax=ax1 if plt_index == 0 else ax2 if show_figure else None,
+            )
+            precision, recall, accuracy, f1, aupr = self.calculate_aupr(
+                y_score=y_score_i, y_true=y_true_i, n_classes=n
+            )
+
+            self.log(f"val_{cell_type}_auroc", auroc, prog_bar=False, on_epoch=True, logger=True)
+            self.log(f"val_{cell_type}_aupr", aupr, prog_bar=False, on_epoch=True, logger=True)
+            self.log(f"val_{cell_type}_f1", f1, prog_bar=False, on_epoch=True, logger=True)
+
+            class_str = f"| {cell_type}: |"
+            class_str += f"| Precision: {precision:.5f} |"
+            class_str += f" Recall: {recall:.5f} |"
+            class_str += f" Accuracy: {accuracy:.5f} |"
+            class_str += f" F1: {f1:.5f} |"
+            class_str += f" Val_AUCROC: {auroc:.5f} |"
+            class_str += f" Val_AUPR: {aupr:.5f} |"
+
+            print("\n".join(["", border, class_str, border, ""]))
+
+            if show_figure:
+                if plt_index == 1:
+                    plt.tight_layout()
+                    plt.show()
+                    plt.close(fig)
+                    plt_index = 0
+                else:
+                    plt_index += 1
+
+    def calculate_auroc(self, y_score, y_true, n_classes, name, show_figure=False, ax=None):
+        y_score = F.softmax(y_score.float(), dim=1).cpu().numpy()
+        y_true = y_true.cpu().numpy()
+        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
+
+        fpr, tpr, roc_auc = dict(), dict(), dict()
+        for i in range(n_classes):
+            fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_score[:, i])
+            roc_auc[i] = auc(fpr[i], tpr[i])
+
+        if show_figure and ax is not None:
+            colors = cycle(["orange", "green", "red", "purple", "blue"])
+            for i, color in zip(range(n_classes), colors):
+                ax.plot(
+                    fpr[i], tpr[i], color=color, lw=1,
+                    label=f"Class {i} (AUC = {roc_auc[i]:0.2f})",
+                )
+            ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random (AUC = 0.5)")
+            ax.set_xlim([-0.05, 1.0])
+            ax.set_ylim([0.0, 1.05])
+            ax.set_xlabel("False Positive Rate")
+            ax.set_ylabel("True Positive Rate")
+            ax.set_title(f"{name} multi-class ROC Curves")
+            ax.legend(loc="lower right")
+
+        return roc_auc_score(y_true_bin, y_score, multi_class="ovr", average="macro")
+
+    def calculate_aupr(self, y_score, y_true, n_classes):
+        y_score = F.softmax(y_score.float(), dim=1).cpu().numpy()
+        y_pred = np.argmax(y_score, axis=1)
+        y_true = y_true.cpu().numpy()
+
+        precision = precision_score(y_true, y_pred, average="macro", zero_division=0)
+        recall = recall_score(y_true, y_pred, average="macro", zero_division=0)
+        accuracy = accuracy_score(y_true, y_pred)
+        f1 = f1_score(y_true, y_pred, average="macro")
+
+        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
+        pr_auc = average_precision_score(y_true_bin, y_score, average="macro")
+        return precision, recall, accuracy, f1, pr_auc
