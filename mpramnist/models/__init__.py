@@ -4,5 +4,8 @@ from .PARM import PARM
 from .Malinois import L1KLmixed, BassetBranched
 from .DeepStarr import DeepStarr
 from .DREAM_RNN import DREAM_RNN, BHIFirstLayersBlock, BHICoreBlock, AutosomeFinalLayersBlock
+from .lyra import Lyra
+from .ReporterNet import ReporterNet, MSEMinusPearsonLoss, initialize_weights_reporternet
 __all__ = ['HumanLegNet', 'initialize_weights', 'MPRAnn', 'PARM', 'L1KLmixed', 'BassetBranched', 'DeepStarr',
-           'DREAM_RNN', 'BHIFirstLayersBlock', 'BHICoreBlock', 'AutosomeFinalLayersBlock']
+           'DREAM_RNN', 'BHIFirstLayersBlock', 'BHICoreBlock', 'AutosomeFinalLayersBlock', 'Lyra', 'ReporterNet', 'MSEMinusPearsonLoss',
+           'initialize_weights_reporternet']
