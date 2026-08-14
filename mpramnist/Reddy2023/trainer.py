@@ -5,21 +5,22 @@ from lightning.pytorch.callbacks import EarlyStopping
 from torchmetrics import PearsonCorrCoef
 
 import numpy as np
-import torch.nn.functional as F
-from itertools import cycle
-
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import label_binarize
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-    auc,
-    roc_curve,
+
+import torch
+import torch.nn as nn
+import lightning.pytorch as L
+
+from torchmetrics.classification import (
+    Accuracy,
+    AUROC,
+    AveragePrecision,
+    F1Score,
+    Precision,
+    Recall,
 )
+
+from sklearn.metrics import auc, roc_curve
     
 class LitModel_Reddy_Reg(L.LightningModule):
     def __init__(
@@ -247,83 +248,172 @@ class LitModel_Reddy_Clas(L.LightningModule):
     def __init__(
         self,
         model,
-        loss=nn.CrossEntropyLoss(),
+        loss=nn.BCEWithLogitsLoss(),
         print_each: int = 1,
         weight_decay: float = 1e-2,
         lr: float = 3e-4,
-        cell_types: list[str] = ["JURKAT", "K562", "THP1"],
-        n_classes: int = 10,
-        # Early stopping
-        early_stopping_patience: int = 10,
-        early_stopping_metric: str = "val_loss",
-        early_stopping_mode: str = "min",
-        # LR scheduling (OneCycleLR)
-        lr_pct_start: float = 0.3,
+        n_labels: int = 3,
+        show_figure: bool = True,
     ):
         super().__init__()
 
         self.model = model
         self.loss = loss
+
         self.print_each = print_each
         self.weight_decay = weight_decay
         self.lr = lr
-        self.lr_pct_start = lr_pct_start
 
-        # Early stopping config — consumed by configure_callbacks()
-        self.early_stopping_patience = early_stopping_patience
-        self.early_stopping_metric = early_stopping_metric
-        self.early_stopping_mode = early_stopping_mode
+        self.n_labels = n_labels
+        self.show_figure = show_figure
 
-        if isinstance(cell_types, str):
-            cell_types = [cell_types]
+        # ------------------------------------------------------------------
+        # Metrics
+        # ------------------------------------------------------------------
 
-        self.cell_types = cell_types
-        self.n_classes = n_classes
-        # assumes classes are split evenly across cell types, e.g. 10 classes / 2 cell
-        # types -> 5 classes per cell type (logits sliced accordingly in compute_loss)
-        self.classes_per_cell_type = n_classes // len(cell_types)
+        self.val_acc = Accuracy(
+            task="multilabel",
+            num_labels=n_labels,
+        )
+        self.val_auroc = AUROC(
+            task="multilabel",
+            num_labels=n_labels,
+        )
+        self.val_aupr = AveragePrecision(
+            task="multilabel",
+            num_labels=n_labels,
+        )
+        self.val_precision = Precision(
+            task="multilabel",
+            num_labels=n_labels,
+            average="macro",
+        )
+        self.val_recall = Recall(
+            task="multilabel",
+            num_labels=n_labels,
+            average="macro",
+        )
+        self.val_f1 = F1Score(
+            task="multilabel",
+            num_labels=n_labels,
+            average="macro",
+        )
 
-        self.y_score = torch.tensor([])
-        self.y_true = torch.tensor([])
+        self.test_acc = Accuracy(
+            task="multilabel",
+            num_labels=n_labels,
+        )
+        self.test_auroc = AUROC(
+            task="multilabel",
+            num_labels=n_labels,
+        )
+        self.test_aupr = AveragePrecision(
+            task="multilabel",
+            num_labels=n_labels,
+        )
+        self.test_precision = Precision(
+            task="multilabel",
+            num_labels=n_labels,
+            average="macro",
+        )
+        self.test_recall = Recall(
+            task="multilabel",
+            num_labels=n_labels,
+            average="macro",
+        )
+        self.test_f1 = F1Score(
+            task="multilabel",
+            num_labels=n_labels,
+            average="macro",
+        )
+
+        # ------------------------------------------------------------------
+        # Predictions for test-time plots
+        # ------------------------------------------------------------------
+
+        self.test_scores = []
+        self.test_targets = []
 
     # ------------------------------------------------------------------
-    # Callbacks
-    # ------------------------------------------------------------------
-
-    def configure_callbacks(self):
-        return [
-            EarlyStopping(
-                monitor=self.early_stopping_metric,
-                patience=self.early_stopping_patience,
-                mode=self.early_stopping_mode,
-                verbose=True,
-            )
-        ]
-
-    def setup(self, stage=None):
-        self.y_score = self.y_score.to(self.device)
-        self.y_true = self.y_true.to(self.device)
-
+    # Forward
     # ------------------------------------------------------------------
 
     def forward(self, x):
         return self.model(x)
 
-    def compute_loss(self, y_hat, y):
-        """Sums the per-cell-type CrossEntropy loss over sliced logit blocks."""
-        n = self.classes_per_cell_type
-        loss = 0.0
-        for i in range(len(self.cell_types)):
-            loss = loss + self.loss(y_hat[:, i * n : (i + 1) * n], y[:, i])
-        return loss
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _update_metrics(self, y_hat, y, metrics_prefix: str):
+        """
+        Update all classification metrics for validation or test.
+        """
+        y_metrics = y.long()
+
+        getattr(self, f"{metrics_prefix}_acc").update(y_hat, y_metrics)
+        getattr(self, f"{metrics_prefix}_auroc").update(y_hat, y_metrics)
+        getattr(self, f"{metrics_prefix}_aupr").update(y_hat, y_metrics)
+        getattr(self, f"{metrics_prefix}_precision").update(y_hat, y_metrics)
+        getattr(self, f"{metrics_prefix}_recall").update(y_hat, y_metrics)
+        getattr(self, f"{metrics_prefix}_f1").update(y_hat, y_metrics)
+
+    def _log_metrics(self, metrics_prefix: str, prog_bar: bool = False):
+        """
+        Compute and log all classification metrics.
+        """
+        metric_names = [
+            "acc",
+            "auroc",
+            "aupr",
+            "precision",
+            "recall",
+            "f1",
+        ]
+
+        values = {}
+
+        for metric_name in metric_names:
+            metric = getattr(self, f"{metrics_prefix}_{metric_name}")
+            value = metric.compute()
+
+            self.log(
+                f"{metrics_prefix}_{metric_name}",
+                value,
+                prog_bar=prog_bar,
+                on_epoch=True,
+                logger=True,
+            )
+
+            values[metric_name] = value
+
+        return values
+
+    def _reset_metrics(self, metrics_prefix: str):
+        """
+        Reset all classification metrics.
+        """
+        metric_names = [
+            "acc",
+            "auroc",
+            "aupr",
+            "precision",
+            "recall",
+            "f1",
+        ]
+
+        for metric_name in metric_names:
+            getattr(self, f"{metrics_prefix}_{metric_name}").reset()
 
     # ------------------------------------------------------------------
-    # Optimiser + scheduler
+    # Optimizer + scheduler
     # ------------------------------------------------------------------
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
-            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+            self.parameters(),
+            lr=self.lr,
+            weight_decay=self.weight_decay,
         )
 
         lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
@@ -331,9 +421,10 @@ class LitModel_Reddy_Clas(L.LightningModule):
             max_lr=self.lr,
             three_phase=False,
             total_steps=self.trainer.estimated_stepping_batches,
-            pct_start=self.lr_pct_start,
+            pct_start=0.3,
             cycle_momentum=False,
         )
+
         lr_scheduler_config = {
             "scheduler": lr_scheduler,
             "interval": "step",
@@ -344,150 +435,298 @@ class LitModel_Reddy_Clas(L.LightningModule):
         return [optimizer], [lr_scheduler_config]
 
     # ------------------------------------------------------------------
-    # Steps
+    # Training
     # ------------------------------------------------------------------
 
-    def training_step(self, batch, batch_nb):
+    def training_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.forward(x)
-        y = y.long()
 
-        loss = self.compute_loss(y_hat, y)
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, logger=True)
+        y_hat = self.forward(x)
+        y = y.float()
+
+        loss = self.loss(y_hat, y)
+
+        self.log(
+            "train_loss",
+            loss,
+            prog_bar=True,
+            on_step=True,
+            on_epoch=True,
+            logger=True,
+        )
+
         return loss
+
+    # ------------------------------------------------------------------
+    # Validation
+    # ------------------------------------------------------------------
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+
         y_hat = self.forward(x)
-        y = y.long()
+        y = y.float()
 
-        loss = self.compute_loss(y_hat, y)
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+        loss = self.loss(y_hat, y)
 
-        self.y_score = torch.cat([self.y_score, y_hat])
-        self.y_true = torch.cat([self.y_true, y])
+        self.log(
+            "val_loss",
+            loss,
+            prog_bar=True,
+            on_step=False,
+            on_epoch=True,
+            logger=True,
+        )
+
+        self._update_metrics(
+            y_hat,
+            y,
+            metrics_prefix="val",
+        )
 
     def on_validation_epoch_end(self):
+        metrics = self._log_metrics(
+            metrics_prefix="val",
+            prog_bar=True,
+        )
+
         if (self.current_epoch + 1) % self.print_each == 0:
-            print("\n| {}: {:.5f} |\n".format("Current_epoch", self.current_epoch))
-            self.shared_test_val_epoch_end()
-        self.y_score = torch.tensor([], device=self.device)
-        self.y_true = torch.tensor([], device=self.device)
+            res_str = f"| Epoch: {self.current_epoch} "
+            res_str += f"| Val Acc: {metrics['acc']:.5f} "
+            res_str += f"| Val AUROC: {metrics['auroc']:.5f} "
+            res_str += f"| Val AUPR: {metrics['aupr']:.5f} "
+            res_str += f"| Val Precision: {metrics['precision']:.5f} "
+            res_str += f"| Val Recall: {metrics['recall']:.5f} "
+            res_str += f"| Val F1: {metrics['f1']:.5f} |"
 
-    def test_step(self, batch, _):
+            border = "-" * len(res_str)
+
+            print(
+                "\n".join(
+                    [
+                        "",
+                        border,
+                        res_str,
+                        border,
+                        "",
+                    ]
+                )
+            )
+
+        self._reset_metrics("val")
+
+    # ------------------------------------------------------------------
+    # Test
+    # ------------------------------------------------------------------
+
+    def test_step(self, batch, batch_idx):
         x, y = batch
+
         y_hat = self.forward(x)
-        y = y.long()
+        y = y.float()
 
-        loss = self.compute_loss(y_hat, y)
-        self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        loss = self.loss(y_hat, y)
 
-        self.y_score = torch.cat([self.y_score, y_hat])
-        self.y_true = torch.cat([self.y_true, y])
+        self.log(
+            "test_loss",
+            loss,
+            prog_bar=True,
+            on_step=False,
+            on_epoch=True,
+            logger=True,
+        )
+
+        self._update_metrics(
+            y_hat,
+            y,
+            metrics_prefix="test",
+        )
+
+        # Save predictions for plots
+        self.test_scores.append(y_hat.detach())
+        self.test_targets.append(y.detach())
 
     def on_test_epoch_end(self):
-        self.shared_test_val_epoch_end(show_figure=True)
-        self.y_score = torch.tensor([], device=self.device)
-        self.y_true = torch.tensor([], device=self.device)
+        metrics = self._log_metrics(
+            metrics_prefix="test",
+            prog_bar=True,
+        )
 
-    def predict_step(self, batch, _):
-        x, y = batch
-        y_hat = self.forward(x)
-        return {
-            "predicted": y_hat.cpu().detach().float(),
-            "target": y.cpu().detach().float(),
-        }
+        res_str = f"| Test Acc: {metrics['acc']:.5f} "
+        res_str += f"| Test AUROC: {metrics['auroc']:.5f} "
+        res_str += f"| Test AUPR: {metrics['aupr']:.5f} "
+        res_str += f"| Test Precision: {metrics['precision']:.5f} "
+        res_str += f"| Test Recall: {metrics['recall']:.5f} "
+        res_str += f"| Test F1: {metrics['f1']:.5f} |"
 
-    # ------------------------------------------------------------------
-    # Metrics / reporting
-    # ------------------------------------------------------------------
+        border = "-" * len(res_str)
 
-    def shared_test_val_epoch_end(self, show_figure: bool = False):
-        border = "-" * 100
-        plt_index = 0
-        n = self.classes_per_cell_type
-
-        fig, ax1, ax2 = (None, None, None)
-        if show_figure:
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-            fig.suptitle("ROC Curves Comparison", fontsize=14)
-
-        for i, cell_type in enumerate(self.cell_types):
-            y_score_i = self.y_score[:, i * n : (i + 1) * n]
-            y_true_i = self.y_true[:, i]
-
-            auroc = self.calculate_auroc(
-                y_score=y_score_i,
-                y_true=y_true_i,
-                n_classes=n,
-                show_figure=show_figure,
-                name=cell_type,
-                ax=ax1 if plt_index == 0 else ax2 if show_figure else None,
+        print(
+            "\n".join(
+                [
+                    "",
+                    border,
+                    res_str,
+                    border,
+                    "",
+                ]
             )
-            precision, recall, accuracy, f1, aupr = self.calculate_aupr(
-                y_score=y_score_i, y_true=y_true_i, n_classes=n
-            )
+        )
 
-            self.log(f"val_{cell_type}_auroc", auroc, prog_bar=False, on_epoch=True, logger=True)
-            self.log(f"val_{cell_type}_aupr", aupr, prog_bar=False, on_epoch=True, logger=True)
-            self.log(f"val_{cell_type}_f1", f1, prog_bar=False, on_epoch=True, logger=True)
+        # --------------------------------------------------------------
+        # Test plots
+        # --------------------------------------------------------------
 
-            class_str = f"| {cell_type}: |"
-            class_str += f"| Precision: {precision:.5f} |"
-            class_str += f" Recall: {recall:.5f} |"
-            class_str += f" Accuracy: {accuracy:.5f} |"
-            class_str += f" F1: {f1:.5f} |"
-            class_str += f" Val_AUCROC: {auroc:.5f} |"
-            class_str += f" Val_AUPR: {aupr:.5f} |"
+        if self.test_scores:
+            y_score = torch.cat(self.test_scores, dim=0)
+            y_true = torch.cat(self.test_targets, dim=0)
 
-            print("\n".join(["", border, class_str, border, ""]))
-
-            if show_figure:
-                if plt_index == 1:
-                    plt.tight_layout()
-                    plt.show()
-                    plt.close(fig)
-                    plt_index = 0
-                else:
-                    plt_index += 1
-
-    def calculate_auroc(self, y_score, y_true, n_classes, name, show_figure=False, ax=None):
-        y_score = F.softmax(y_score.float(), dim=1).cpu().numpy()
-        y_true = y_true.cpu().numpy()
-        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
-
-        fpr, tpr, roc_auc = dict(), dict(), dict()
-        for i in range(n_classes):
-            fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_score[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-
-        if show_figure and ax is not None:
-            colors = cycle(["orange", "green", "red", "purple", "blue"])
-            for i, color in zip(range(n_classes), colors):
-                ax.plot(
-                    fpr[i], tpr[i], color=color, lw=1,
-                    label=f"Class {i} (AUC = {roc_auc[i]:0.2f})",
+            if self.show_figure:
+                fig, (ax1, ax2) = plt.subplots(
+                    1,
+                    2,
+                    figsize=(12, 4),
                 )
-            ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random (AUC = 0.5)")
-            ax.set_xlim([-0.05, 1.0])
-            ax.set_ylim([0.0, 1.05])
-            ax.set_xlabel("False Positive Rate")
-            ax.set_ylabel("True Positive Rate")
-            ax.set_title(f"{name} multi-class ROC Curves")
-            ax.legend(loc="lower right")
+            else:
+                ax1 = None
+                ax2 = None
 
-        return roc_auc_score(y_true_bin, y_score, multi_class="ovr", average="macro")
+            self.calculate_auroc(
+                y_score,
+                y_true,
+                ax=ax1,
+            )
 
-    def calculate_aupr(self, y_score, y_true, n_classes):
-        y_score = F.softmax(y_score.float(), dim=1).cpu().numpy()
-        y_pred = np.argmax(y_score, axis=1)
+            self.plot_hist(
+                y_score,
+                y_true,
+                ax=ax2,
+            )
+
+            if self.show_figure:
+                plt.tight_layout()
+                plt.show()
+
+        self._reset_metrics("test")
+
+        self.test_scores.clear()
+        self.test_targets.clear()
+
+    # ------------------------------------------------------------------
+    # Test plots
+    # ------------------------------------------------------------------
+
+    def calculate_auroc(
+        self,
+        y_score,
+        y_true,
+        ax=None,
+    ):
+        """
+        Calculate and optionally plot ROC curves for each label.
+        """
+        y_score = torch.sigmoid(y_score.float()).cpu().numpy()
         y_true = y_true.cpu().numpy()
 
-        precision = precision_score(y_true, y_pred, average="macro", zero_division=0)
-        recall = recall_score(y_true, y_pred, average="macro", zero_division=0)
-        accuracy = accuracy_score(y_true, y_pred)
-        f1 = f1_score(y_true, y_pred, average="macro")
+        fpr = {}
+        tpr = {}
+        roc_auc = {}
 
-        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
-        pr_auc = average_precision_score(y_true_bin, y_score, average="macro")
-        return precision, recall, accuracy, f1, pr_auc
+        for label_idx in range(self.n_labels):
+            fpr[label_idx], tpr[label_idx], _ = roc_curve(
+                y_true[:, label_idx],
+                y_score[:, label_idx],
+            )
+
+            roc_auc[label_idx] = auc(
+                fpr[label_idx],
+                tpr[label_idx],
+            )
+
+        if ax is None:
+            return
+
+        for label_idx in range(self.n_labels):
+            ax.plot(
+                fpr[label_idx],
+                tpr[label_idx],
+                lw=1,
+                label=f"Label {label_idx} (AUC = {roc_auc[label_idx]:.2f})",
+            )
+
+        ax.plot(
+            [0, 1],
+            [0, 1],
+            "k--",
+            lw=1,
+            label="Random (AUC = 0.5)",
+        )
+
+        ax.set_xlim([-0.05, 1.0])
+        ax.set_ylim([0.0, 1.05])
+
+        ax.set_xlabel("False Positive Rate")
+        ax.set_ylabel("True Positive Rate")
+        ax.set_title("ROC Curves for Each Label")
+        ax.legend(loc="lower right")
+
+    def plot_hist(
+        self,
+        y_score,
+        y_true,
+        ax=None,
+    ):
+        """
+        Plot the number of positive predictions for each label.
+        """
+        if ax is None:
+            return
+
+        y_score = torch.sigmoid(y_score.float()).cpu().numpy()
+
+        y_pred = (y_score > 0.5).astype(int)
+
+        positive_counts = np.sum(
+            y_pred,
+            axis=0,
+        )
+
+        ax.bar(
+            np.arange(self.n_labels),
+            positive_counts,
+            edgecolor="black",
+        )
+
+        for label_idx, count in enumerate(positive_counts):
+            ax.text(
+                label_idx,
+                count,
+                str(count),
+                ha="center",
+                va="bottom",
+                fontsize=10,
+                fontweight="bold",
+            )
+
+        ax.set_xlabel("Label")
+        ax.set_ylabel("Positive Predictions Count")
+        ax.set_title("Positive Predictions per Label")
+        ax.grid(
+            axis="y",
+            linestyle="--",
+            alpha=0.7,
+        )
+
+    # ------------------------------------------------------------------
+    # Prediction
+    # ------------------------------------------------------------------
+
+    def predict_step(self, batch, batch_idx):
+        x, y = batch
+
+        y_hat = self.forward(x)
+
+        return {
+            "y": y.float().cpu().detach(),
+            "pred": y_hat.cpu().detach(),
+        }
