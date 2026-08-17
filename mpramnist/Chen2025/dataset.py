@@ -40,10 +40,10 @@ class ChenMultiDataset(MpraDataset):
         >>>                                 states = ['IFNB', 'IFNG'])
         >>> 
         >>> # Load data with custom sequence length
-        >>> dataset = GuoMultiDataset(length=200, cell_types='Brain', states='Cortex')
+        >>> dataset = ChenMultiDataset(length=200, cell_types='Brain', states='Cortex')
         >>> 
         >>> # Load data filtered by genomic regions
-        >>> dataset = GuoMultiDataset(
+        >>> dataset = ChenMultiDataset(
         ...     genomic_regions='path/to/regions.bed',
         ...     cell_types='Brain',
         ...     targets='Cortex'
