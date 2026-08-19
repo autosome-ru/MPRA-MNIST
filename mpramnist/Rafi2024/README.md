@@ -183,7 +183,7 @@ Root directory for data storage. If `None`, uses default data directory.
 
 ```bash
 #MPRALegNet
-python3 Rafi_model_launch.py --model MPRALegNet --epoch_num 5 --runs 5 --result_dir ./rafi_legnet.tsv lr 1e-0.5 --wd 0.001
+python3 Rafi_model_launch.py --model MPRALegNet --epoch_num 12 --runs 5 --result_dir ./rafi_legnet.tsv --lr 0.005 --wd 0.01
 #Malinois
 python3 Rafi_model_launch.py --model Malinois --epoch_num 30 --runs 5 --result_dir ./rafi_malinois.tsv
 #MPRAnn
@@ -191,7 +191,11 @@ python3 Rafi_model_launch.py --model MPRAnn --epoch_num 30 --runs 5 --result_dir
 #PARM
 python3 Rafi_model_launch.py --model PARM --epoch_num 30 --runs 5 --result_dir ./rafi_parm.tsv
 #DREAM-RNN
-python3 Rafi_model_launch.py --model DREAM-RNN --lr 0.005 --wd 0.01 --epoch_num 80 --runs 1 --result_dir ./rafi_dream_rnn_try_orig_params.tsv
+python3 Rafi_model_launch.py --model DREAM-RNN --lr 0.005 --wd 0.01 --epoch_num 80 --runs 5 --result_dir ./rafi_dream_rnn.tsv
+#Lyra
+python3 Rafi_model_launch.py --model Lyra --epoch_num 30 --runs 5 --result_dir ./rafi_lyra.tsv
+#ReporterNet
+python3 Rafi_model_launch.py --model ReporterNet --lr 0.005 --wd 0.01 --epoch_num 12 --runs 5 --result_dir ./rafi_reporternet.tsv
 ```
 
 ## Achieved Performance Using Basic Models

@@ -18,6 +18,7 @@ import os
 import pandas as pd
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import lightning.pytorch as L
 from lightning.pytorch import loggers as pl_loggers
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
@@ -25,6 +26,8 @@ from torch.utils.data import DataLoader
 from torchmetrics import PearsonCorrCoef
 
 import mpramnist.transforms as t
+import mpramnist.target_transforms as t_t
+import mpramnist.joint_transforms as j_t
 from mpramnist.Rafi2024 import RafiDataset, LitModel_Rafi
 from mpramnist.models import (
     HumanLegNet,
@@ -131,47 +134,76 @@ def build_transforms(dataset_cls: type[RafiDataset], sequence_first: bool = Fals
     right_flank = dataset_cls.RIGHT_FLANK
     left_flank = plasmid[insert_start - SEQ_LEN : insert_start]
 
-    train_transform = t.Compose(
-        [
-            t.AddFlanks(left_flank, right_flank),
-            t.LeftCrop(SEQ_LEN, SEQ_LEN),
-            t.ReverseComplement(0.5),
-            t.Seq2Tensor(sequence_first=sequence_first),
-        ]
-    )
-    test_transform = t.Compose(
-        [
-            t.AddFlanks(left_flank, right_flank),
-            t.LeftCrop(SEQ_LEN, SEQ_LEN),
-            t.ReverseComplement(0),
-            t.Seq2Tensor(sequence_first=sequence_first),
-        ]
-    )
+    train_transform = t.Compose([t.AddFlanks(left_flank, right_flank),
+                                t.LeftCrop(SEQ_LEN, SEQ_LEN),
+                                t.ReverseComplement(0.5), 
+                                t.AddFeatureChannels(channels=['is_singleton']),
+                                t.AddReverseChannel(),
+                                t.Seq2Tensor(sequence_first=sequence_first)])
+
+    val_transform = t.Compose([t.AddFlanks(left_flank, right_flank),
+                                    t.LeftCrop(SEQ_LEN, SEQ_LEN),
+                                    t.ReverseComplement(0),
+                                    t.AddFeatureChannels(channels=['is_singleton']),
+                                    t.AddReverseChannel(),
+                                    t.Seq2Tensor(sequence_first=sequence_first),])
 
     # Used at test time to average forward-strand and reverse-complement predictions.
-    forward_transform = t.Compose(
-        [
-            t.AddFlanks(left_flank, right_flank),
-            t.LeftCrop(SEQ_LEN, SEQ_LEN),
-            t.Seq2Tensor(sequence_first=sequence_first),
-        ]
-    )
-    reverse_transform = t.Compose(
-        [
-            t.AddFlanks(left_flank, right_flank),
-            t.LeftCrop(SEQ_LEN, SEQ_LEN),
-            t.ReverseComplement(1),
-            t.Seq2Tensor(sequence_first=sequence_first),
-        ]
-    )
+    forward_transform = t.Compose([t.AddFlanks(left_flank, right_flank),
+                                    t.LeftCrop(SEQ_LEN, SEQ_LEN),
+                                    t.ReverseComplement(0),
+                                    j_t.NotASingleton(),
+                                    t.AddFeatureChannels(channels=['is_singleton']),
+                                    t.AddReverseChannel(),
+                                    t.Seq2Tensor(sequence_first=sequence_first),])
+    reverse_transform = t.Compose([t.AddFlanks(left_flank, right_flank),
+                                    t.LeftCrop(SEQ_LEN, SEQ_LEN),
+                                    t.ReverseComplement(1),
+                                    j_t.NotASingleton(),
+                                    t.AddFeatureChannels(channels=['is_singleton']),
+                                    t.AddReverseChannel(),
+                                    t.Seq2Tensor(sequence_first=sequence_first),])
 
     return {
         "train": train_transform,
-        "test": test_transform,
+        "val": val_transform,
         "forward": forward_transform,
         "reverse": reverse_transform,
     }
 
+# =============================================================================
+# Rafi probs
+# =============================================================================
+
+class AutosomeFinalLayersBlock(nn.Module):
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        out_channels=18
+
+        self.register_buffer('bins', torch.arange(start=0, end=out_channels, step=1, requires_grad=False))
+
+    def forward(self, x):
+        logprobs = F.log_softmax(x, dim=1) 
+        x = F.softmax(x, dim=1)
+        score = (x * self.bins).sum(dim=1)
+        if self.training:
+            return {'value': score, 'probs': logprobs}
+        else:
+            return score
+
+class Rafi_Probs(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        
+        self.model = model
+        self.prob_and_value = AutosomeFinalLayersBlock()
+
+    def forward(self, x):
+        x = self.model(x)
+        x = self.prob_and_value(x)
+        return x
 
 # =============================================================================
 # Model factory
@@ -187,48 +219,51 @@ def build_model(model_name: str, in_channels: int, seq_len: int):
 
     Returns (model, loss, learning_rate_reduce)
     """
-    loss = nn.MSELoss()
     learning_rate_reduce = True
     lr_sheduler_to_use = "one_cycle"
+    out_channels = 18
 
     if model_name == "MPRALegNet":
         model = HumanLegNet(
             in_ch=in_channels,
-            output_dim=1,
+            output_dim=out_channels,
             stem_ch=64,
-            stem_ks=11,
-            ef_ks=9,
-            ef_block_sizes=[80, 96, 112, 128],
-            pool_sizes=[2, 2, 2, 2],
+            stem_ks=7,
+            ef_ks=7,
+            ef_block_sizes=[256, 128, 128, 64, 64, 64, 64],
+            pool_sizes=[1, 1, 1, 1, 1, 1, 1],
             resize_factor=4,
         )
         model.apply(initialize_weights)
 
     elif model_name == "MPRAnn":
-        model = MPRAnn(output_dim=1)
+        model = MPRAnn(in_channels=in_channels, output_dim=out_channels)
 
     elif model_name == "Malinois":
-        model = BassetBranched(input_len=seq_len, n_outputs=1)
+        model = BassetBranched(n_channels=in_channels, input_len=seq_len, n_outputs=out_channels)
 
     elif model_name == "PARM":
-        model = PARM(n_block=5, type_loss="mse", output_dim=1)
+        model = PARM(vocab=in_channels, n_block=5, type_loss="mse", output_dim=out_channels)
 
     elif model_name in ("DREAM-RNN", "DREAM_RNN"):
-        model = DREAM_RNN(in_channels=in_channels, seqsize=seq_len, out_channels=1)
+        model = DREAM_RNN(in_channels=in_channels, seqsize=seq_len, out_channels=out_channels)
 
     elif model_name.lower() == "lyra":
-        model = Lyra(d_input=in_channels, d_output=1, d_model=512, dropout=0.1)
+        model = Lyra(d_input=in_channels, d_output=out_channels, d_model=512, dropout=0.1)
         lr_sheduler_to_use = "reducelronplateau"
 
     elif model_name == "ReporterNet":
-        model = ReporterNet(dropout_rate=0.2, output_dim=1)
+        model = ReporterNet(in_ch=in_channels, dropout_rate=0.2, output_dim=out_channels,
+        filters=512,
+        num_dilation_layers=6,
+        dilation_rates=(1, 2, 4, 8, 16, 16))
         model.apply(initialize_weights_reporternet)
         learning_rate_reduce = None
 
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
-    return model, loss, lr_sheduler_to_use, learning_rate_reduce
+    return model, lr_sheduler_to_use, learning_rate_reduce
 
 
 # =============================================================================
@@ -288,9 +323,10 @@ def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: 
     print(f"\n### Run {run_idx + 1}/{args.runs} — model: {args.model} ###")
 
     # ---- Data ---------------------------------------------------------
-    train_dataset = RafiDataset(split="train", transform=transforms["train"], root=args.root)
+    train_dataset = RafiDataset(split="train", transform=transforms["train"], root=args.root, target_transform=t_t.SoftBinTarget(), 
+                            joint_transform=j_t.IsSingleton())
     val_dataset = RafiDataset(
-        split="val", data_type=["all"], transform=transforms["test"], root=args.root
+        split="val", data_type=["all"], transform=transforms["val"], root=args.root, joint_transform=j_t.IsSingleton()
     )
 
     train_loader = DataLoader(
@@ -309,13 +345,15 @@ def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: 
         in_channels, seq_len = sample_seq.shape[0], sample_seq.shape[1]
 
     # ---- Model ----------------------------------------------------------
-    model, loss, lr_sheduler_to_use, learning_rate_reduce = build_model(model_name=args.model, in_channels=in_channels, seq_len=seq_len)
+    model, lr_sheduler_to_use, learning_rate_reduce = build_model(model_name=args.model, in_channels=in_channels, seq_len=seq_len)
 
+    model = Rafi_Probs(model)
+    
     lit_model = LitModel_Rafi(
-        model=model, loss=loss, weight_decay=args.wd, lr=args.lr, print_each=1, lr_sheduler_to_use=lr_sheduler_to_use, learning_rate_reduce=learning_rate_reduce,)
+        model=model, weight_decay=args.wd, lr=args.lr, print_each=1, lr_sheduler_to_use=lr_sheduler_to_use, learning_rate_reduce=learning_rate_reduce,)
 
     # ---- Trainer setup ----------------------------------------------------
-    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name="Rafi")
+    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name=f"lr_{args.lr}_wd_{args.wd}")
 
     early_stopping_callback = EarlyStopping(
         monitor="val_pearson", mode="max", patience=8, min_delta=0.0

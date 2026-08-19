@@ -35,10 +35,12 @@ class MpraDataset(Dataset):
         root,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
+        joint_transform: Optional[Callable] = None
     ):
         self.split = split
         self.transform = transform
         self.target_transform = target_transform
+        self.joint_transform = joint_transform
         self._scalars = {}
         self._vectors = {}
 
@@ -66,6 +68,7 @@ class MpraDataset(Dataset):
                 if hasattr(self, "scalars")
                 else {}
             )
+
             vecs = (
                 {name: vec[idx] for name, vec in self.vectors.items()}
                 if hasattr(self, "vectors")
@@ -73,16 +76,25 @@ class MpraDataset(Dataset):
             )
 
             Seq = seqobj(seq=sequence, scalars=scals, vectors=vecs, split=self.split)
-
-            if self.transform is not None:
-                Seq = self.transform(Seq)
-
-            # Using original key name (seq, seq1, etc)
-            seqs_datasets[seq_key] = Seq.seq
+            seqs_datasets[seq_key] = Seq
 
         target = torch.tensor(self.ds["targets"][idx].astype(np.float32))
+        
+        if self.joint_transform is not None:
+            for seq_key, sequence in seqs_datasets.items():
+                Seq = self.joint_transform(sequence, target)
+                seqs_datasets[seq_key] = Seq
+
         if self.target_transform is not None:
             target = self.target_transform(target)
+
+        if self.transform is not None:
+            for seq_key, sequence in seqs_datasets.items():
+                Seq = self.transform(sequence)
+                seqs_datasets[seq_key] = Seq
+
+        for seq_key, sequence in seqs_datasets.items():
+            seqs_datasets[seq_key] = sequence.seq
 
         if len(seqs_datasets) > 1:
             return seqs_datasets, target  # {seq : seq, seq1 : seq1, ..., targets}

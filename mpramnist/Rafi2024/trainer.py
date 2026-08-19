@@ -10,7 +10,8 @@ class LitModel_Rafi(L.LightningModule):
     def __init__(
         self,
         model,
-        loss=nn.MSELoss(),
+        clf_loss=nn.KLDivLoss(reduction= "batchmean"), 
+        eval_loss=nn.MSELoss(),
         print_each: int = 1,
         weight_decay: float = 1e-2,
         lr: float = 3e-4,
@@ -28,7 +29,8 @@ class LitModel_Rafi(L.LightningModule):
         super().__init__()
 
         self.model = model
-        self.loss = loss
+        self.clf_loss = clf_loss
+        self.eval_loss = eval_loss
         self.print_each = print_each
         self.weight_decay = weight_decay
         self.lr = lr
@@ -114,18 +116,29 @@ class LitModel_Rafi(L.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_nb):
-        X, y = batch
-        y_hat = self.forward(X)
-        loss = self.loss(y_hat, y)
+        X, real = batch
+        prediction = self.forward(X)
+        y_hat_value = prediction['value']
+        y_hat_probs = prediction['probs']
 
-        self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True)
-        self.train_pearson.update(y_hat, y)
+        y_value = real['value']
+        y_probs = real['probs']
+        y_hat_value, y_value = y_hat_value.squeeze(-1), y_value.squeeze(-1)
+        loss = self.clf_loss(y_hat_probs, y_probs)
+
+        self.log(
+            "train_loss", loss, prog_bar=True, on_step=False, on_epoch=True, logger=True
+        )
+        self.train_pearson.update(y_hat_value, y_value)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self.forward(x)
-        loss = self.loss(y_hat, y)
+
+        #y_hat_value, y_value = y_hat.squeeze(-1), y.squeeze(-1)
+
+        loss = self.eval_loss(y_hat, y)
 
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.val_pearson.update(y_hat, y)
@@ -151,7 +164,7 @@ class LitModel_Rafi(L.LightningModule):
     def test_step(self, batch, _):
         x, y = batch
         y_hat = self.forward(x)
-        loss = self.loss(y_hat, y)
+        loss = self.eval_loss(y_hat, y)
 
         self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.test_pearson.update(y_hat, y)

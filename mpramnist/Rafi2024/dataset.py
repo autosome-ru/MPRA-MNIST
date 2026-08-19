@@ -117,6 +117,7 @@ class RafiDataset(MpraDataset):
         data_type: str | List[str] = None,
         transform=None,
         target_transform=None,
+        joint_transform=None,
         root=None,
     ):
         """
@@ -152,6 +153,7 @@ class RafiDataset(MpraDataset):
         # Initialize transformations
         self.transform = transform
         self.target_transform = target_transform
+        self.joint_transform = joint_transform
         self.prefix = self.FLAG + "_"
         self.cell_type = "strains S288C::ura3, etc"
 
@@ -196,6 +198,7 @@ class RafiDataset(MpraDataset):
             file_name = self.prefix + dataset + ".tsv"
             self.download(self._data_path, file_name)
             file_path = os.path.join(self._data_path, file_name)
+            print(file_path)
             df = pd.read_csv(file_path, sep="\t")
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {file_path}")
