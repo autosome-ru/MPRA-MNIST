@@ -357,7 +357,7 @@ def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: 
         weight_decay=args.wd,
         lr=args.lr,
         print_each=1,
-        lr_sheduler_to_use=lr_scheduler_to_use,
+        lr_scheduler_to_use=lr_scheduler_to_use,
         learning_rate_reduce=learning_rate_reduce,
     )
 

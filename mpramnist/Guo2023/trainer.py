@@ -16,7 +16,7 @@ class LitModel_Guo(L.LightningModule):
         print_each: int = 1,
         weight_decay: float = 1e-2,
         lr: float = 3e-4,
-        lr_sheduler_to_use = "one_cycle", # or reducelronplateau
+        lr_scheduler_to_use = "one_cycle", # or reducelronplateau
         # Early stopping
         early_stopping_patience: int = 10,
         early_stopping_metric: str = "val_loss",
@@ -36,7 +36,7 @@ class LitModel_Guo(L.LightningModule):
         self.weight_decay = weight_decay
 
         self.lr = lr
-        self.lr_sheduler_to_use = lr_sheduler_to_use
+        self.lr_scheduler_to_use = lr_scheduler_to_use
 
         # Early stopping config — consumed by configure_callbacks()
         self.early_stopping_patience = early_stopping_patience
@@ -76,7 +76,7 @@ class LitModel_Guo(L.LightningModule):
                 self.parameters(), lr=self.lr, weight_decay=self.weight_decay
             )
 
-        if self.lr_sheduler_to_use == "one_cycle":
+        if self.lr_scheduler_to_use == "one_cycle":
 
             lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
@@ -93,7 +93,7 @@ class LitModel_Guo(L.LightningModule):
                 "name": "cycle_lr",
             }
         
-        elif self.lr_sheduler_to_use == "reducelronplateau":
+        elif self.lr_scheduler_to_use == "reducelronplateau":
             
             lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
