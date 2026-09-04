@@ -191,7 +191,7 @@ python3 Rafi_model_launch.py --model MPRAnn --epoch_num 30 --runs 5 --result_dir
 #PARM
 python3 Rafi_model_launch.py --model PARM --epoch_num 30 --runs 5 --result_dir ./rafi_parm.tsv
 #DREAM-RNN
-python3 Rafi_model_launch.py --model DREAM-RNN --lr 0.005 --wd 0.01 --epoch_num 80 --runs 5 --result_dir ./rafi_dream_rnn.tsv
+python3 Rafi_model_launch.py --model DREAM-RNN --lr 0.005 --wd 0.01 --epoch_num 80 --runs 5 --result_dir ./rafi_dream_rnn_probs.tsv
 #Lyra
 python3 Rafi_model_launch.py --model Lyra --epoch_num 30 --runs 5 --result_dir ./rafi_lyra.tsv
 #ReporterNet
@@ -204,15 +204,15 @@ Pearson correlation, r^2
 
 Experiment | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM_RNN |
 |:---------------:|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:| :--------------------:|
-| All Sequences | 0,95 | 0,928 | 0,8521 | 0,7649 | 0,7741 | 0,95 |
-| High | 0,51 | 0,285 | 0,0768 | 0,0378 | 0,0477 | 0,51 |
-| Low | 0,51 | 0,152 | 0,2553 | 0,1109 | 0,1279 | 0,51 |
-| Native | 0,78 | 0,745 | 0,6274 | 0,4144 | 0,407 | 0,78 |
-| Random | 0,96 | 0,951 | 0,9238 | 0,8391 | 0,859 | 0,96 |
-| Challenging | 0,94 | 0,909 | 0,7252 | 0,6494 | 0,7033 | 0,94 |
-| SNVs | 0,73 | 0,688 | 0,5297 | 0,3366 | 0,3487 | 0,73 |
-| Motif Perturbation | 0,96 | 0,945 | 0,8683 | 0,7209 | 0,7838 | 0,96 |
-| Motif Tiling | 0,91 | 0,855 | 0,6644| 0,5916 | 0,5131 | 0,91 |
+| All Sequences | 0,95 | 0.9505 | 0,8521 | 0,7649 | 0,7741 | 0.9299 |
+| High | 0,51 | 0.5399 | 0,0768 | 0,0378 | 0,0477 | 0.5106 |
+| Low | 0,51 | 0.5038 | 0,2553 | 0,1109 | 0,1279 | 0.4479 |
+| Native | 0,78 | 0.7934 | 0,6274 | 0,4144 | 0,407 | 0.7117 |
+| Random | 0,96 | 0.9602 | 0,9238 | 0,8391 | 0,859 | 0.9519 |
+| Challenging | 0.9423 | 0,909 | 0,7252 | 0,6494 | 0,7033 | 0.9056 |
+| SNVs | 0,73 | 0.7315 | 0,5297 | 0,3366 | 0,3487 | 0.7069 |
+| Motif Perturbation |0.9566 | 0,945 | 0,8683 | 0,7209 | 0,7838 | 0.9545 |
+| Motif Tiling | 0.9009 | 0,855 | 0,6644| 0,5916 | 0,5131 | 0.8644 |
 
  
 

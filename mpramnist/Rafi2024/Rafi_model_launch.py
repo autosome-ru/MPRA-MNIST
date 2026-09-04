@@ -380,7 +380,7 @@ def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: 
     # Reload the best checkpoint (by val_pearson) before evaluating.
     best_model_path = checkpoint_callback.best_model_path
     lit_model = LitModel_Rafi.load_from_checkpoint(
-        best_model_path, model=model, loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1
+        best_model_path, model=model, eval_loss=nn.MSELoss(), weight_decay=args.wd, lr=args.lr, print_each=1
     )
 
     # ---- Test: per data_type, average forward-strand and reverse-complement
