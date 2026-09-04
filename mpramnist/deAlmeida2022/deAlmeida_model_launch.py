@@ -176,11 +176,11 @@ def build_model(model_name: str, in_channels: int, seq_len: int, num_outputs: in
         model = HumanLegNet(
             in_ch=in_channels,
             output_dim=num_outputs,
-            stem_ch=64,
+            stem_ch=512,
             stem_ks=11,
             ef_ks=9,
-            ef_block_sizes=[80, 96, 112, 128],
-            pool_sizes=[2, 2, 2, 2],
+            ef_block_sizes=[256, 256, 256, 256, 256, 256],
+            pool_sizes=[2, 2, 2, 2, 2, 2],
             resize_factor=4,
         )
         model.apply(initialize_weights)
@@ -308,7 +308,7 @@ def run_single_training_run(run_idx: int, args: argparse.Namespace, transforms: 
     )
 
     # ---- Trainer setup ----------------------------------------------------
-    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name="_".join(args.promoter_types))
+    logger = pl_loggers.TensorBoardLogger(f"./{args.model}_logs", name=f"lr_{args.lr}_wd_{args.wd}")
 
     checkpoint_callback = ModelCheckpoint(
         monitor="val_pearson", mode="max", save_top_k=1, save_last=False

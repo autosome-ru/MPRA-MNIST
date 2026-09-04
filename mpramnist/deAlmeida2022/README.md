@@ -168,7 +168,7 @@ val_loader = DataLoader(
 
 ```bash
 #MPRALegNet
-python3 deAlmeida_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.1 --epoch_num 1 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_legnet_test.tsv
+python3 deAlmeida_model_launch.py --model MPRALegNet --lr 0.01 --wd 0.01 --epoch_num 20 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_legnet.tsv
 #Malinois
 python3 deAlmeida_model_launch.py --model Malinois --lr 0.01 --wd 0.1 --epoch_num 50 --runs 5 --promoter_types Dev_log2 Hk_log2 --result_dir ./deAlmeida_malinois.tsv
 #MPRAnn
@@ -185,8 +185,8 @@ python3 deAlmeida_model_launch.py --model DREAM_RNN --lr 0.01 --wd 0.1 --epoch_n
 
 | Cel type | Original performance | MPRALegnet | Mprann | Malinois | PARM | DREAM-RNN |
 |-----------|:---------------:|:----------------:|:-------------------:|:--------------------:|:--------------------:|:--------------------:|
-| Developmental | 0,68 | 0,718 | 0,7121 | 0.6871 | 0.7117 | 0.7295 |
-| Housekeeping | 0,74 | 0,786 | 0,7815 | 0.7751 | 0.7845 | 0.7986 |
+| Developmental | 0,68 | 0.7274 | 0,7121 | 0.6871 | 0.7117 | 0.7295 |
+| Housekeeping | 0,74 | 0.7962 | 0,7815 | 0.7751 | 0.7845 | 0.7986 |
 
 ## Citation
 
